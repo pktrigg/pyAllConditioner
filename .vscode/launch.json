@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [        
+        {
+            "name": "Python",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "program": "${file}",
+            "pythonPath": "c:/python34/python.exe",
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput"
+            ],
+            "args": ["-i", "C:/development/python/EM302/1504_20140905_230622_Fugro_Equator_GA4421.all"]
+        }
+   ]
+}
+            // "args": ["-r","-i", "C:/development/"]
