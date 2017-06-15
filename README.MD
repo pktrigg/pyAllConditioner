@@ -10,12 +10,12 @@ pyAllConditioner
 
 2DO
 ===
-Implement writing of the new file.  by default use append _1.all to make a new filename
-Implement -exclude <recordIdentifiers> to exclude records from the output, eg -x PA to remove the position (P) and attitude (A) records.  Note this needs to be case sensitive
 Implement -inject <filename> to inject .srh delayed heave into the .all file.
 
 Done
 ====
+Implement writing of the new file.  by default use append _1.all to make a new filename
+Implement -x <recordIdentifiers> to exclude records from the output, eg -x PA to remove the position (P) and attitude (A) records.  Note this needs to be case sensitive
 
 Example
 -------

@@ -13,7 +13,7 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-i", "C:/development/python/EM302/1504_20140905_230622_Fugro_Equator_GA4421.all"]
+            "args": ["-i", "C:/development/python/EM302/0004_20110307_041009.all"]
         }
    ]
 }
