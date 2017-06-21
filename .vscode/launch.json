@@ -13,7 +13,7 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-i", "C:/development/python/EM302/0004_20110307_041009.all"]
+            "args": ["-i", "C:/development/python/sample.all", "-j", "C:/development/python/pyAllConditioner/attitude.csv"]
         }
    ]
 }

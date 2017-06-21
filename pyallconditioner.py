@@ -1,3 +1,4 @@
+import csv
 import sys
 import time
 import os
@@ -9,12 +10,14 @@ from datetime import timedelta
 from glob import glob
 import pyall
 
+
 def main():
     parser = ArgumentParser(description='Read Kongsberg ALL file and condition the file by removing redundant records and injecting updated information to make the file self-contained.',
             epilog='Example: \n To condition a single file use -i c:/temp/myfile.all \n to condition all files in a folder use -i c:/temp/*.all\n To condition all .all files recursively in a folder, use -r -i c:/temp \n To condition all .all files recursively from the current folder, use -r -i ./ \n', formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-i', dest='inputFile', action='store', help='-i <ALLfilename> : input ALL filename to image. It can also be a wildcard, e.g. *.all')
-    parser.add_argument('-x', dest='exclude', action='store', default="", help='-x <datagramsID[s]> : exclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
-    parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='-r : search recursively.  [Default: False]')
+    parser.add_argument('-i', dest='inputFile', action='store', help='-i <ALLfilename> : Input ALL filename to image. It can also be a wildcard, e.g. *.all')
+    parser.add_argument('-x', dest='exclude', action='store', default="", help='-x <datagramsID[s]> : eXclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
+    parser.add_argument('-j', dest='injectFileName', action='store', default="", help='-j <filename> : inJect this file.  Depending on the filename, the correct datagram will be created e.g. -j delayedHeave.srh')
+    parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='-r : search Recursively.  [Default: False]')
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(1)
@@ -23,7 +26,8 @@ def main():
 
     fileCounter=0
     matches = []
-        
+    inject = False
+
     if args.recursive:
         for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
             for f in fnmatch.filter(filenames, '*.all'):
@@ -37,8 +41,14 @@ def main():
         print ("Nothing found in %s to convert, quitting" % args.inputFile)
         exit()
 
+    # the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
+    if len(args.injectFileName) > 0:
+        injectionData = loadFileToInject(args.injectFileName)
+        inject = True
+
     for filename in matches:
 
+        # if TypeOfDatagram not in args.exclude:
         # create an output file based on the input
         outFileName  = createOutputFileName(filename)
         outFilePtr = open(outFileName, 'bw')
@@ -54,28 +64,17 @@ def main():
 
         while r.moreData():
             # read a datagram.  If we support it, return the datagram type and aclass for that datagram
-            # The user then needs to call the read() method for the class to undertake a fileread and binary decode.  This keeps the read super quick.
             TypeOfDatagram, datagram = r.readDatagram()
+
+            # before we write the datagram out, we need to inject records with a smaller from_timestamp
+            if inject:    
+                injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), injectionData)
 
             if TypeOfDatagram not in args.exclude:
                 # read the bytes into a buffer 
                 rawBytes = r.readDatagramBytes(datagram.offset, datagram.bytes)
                 # write the bytes to the new file
                 outFilePtr.write(rawBytes)
-
-            # if TypeOfDatagram == 'I':
-            #     datagram.read()
-            #     print (datagram.installationParameters)
-            #     #  print ("Lat: %.5f Lon: %.5f" % (datagram.Latitude, datagram.Longitude))
-            # if TypeOfDatagram == 'D':
-            #     datagram.read()
-            #     nadirBeam = int(datagram.NBeams / 2)
-            #     # print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f Checksum %s" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth, datagram.checksum)))
-            # if TypeOfDatagram == 'X':
-            #     datagram.read()
-            #     # nadirBeam = int(datagram.NBeams / 2)
-            #     # print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth)))
-            #     pingCount += 1
 
         update_progress("Processed: %s (%d/%d)" % (filename, fileCounter, len(matches)), (fileCounter/len(matches)))
         # lastTimeStamp = update[0]
@@ -85,6 +84,19 @@ def main():
     update_progress("Process Complete: ", (fileCounter/len(matches)))
     print ("Saving conditioned file to: %s" % outFileName)        
     outFilePtr.close()
+
+# inject data into the output file and pop the record from the injector
+def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injectionData):
+    while (float(injectionData[0][0]) <= currentRecordTimeStamp):
+        print("popping")
+        record = injectionData.pop(0)
+        a = pyall.A_ATTITUDE_WRITER()
+        a.encode(recordDate, recordTime, float(record[1]), float(record[2]), float(record[3]), float(record[4]))
+def loadFileToInject(injectFileName):
+    with open(injectFileName, 'r') as f:
+        reader = csv.reader(f)
+        injectionData = list(reader)
+    return injectionData
 
 def from_timestamp(unixtime):
     return datetime(1970, 1 ,1) + timedelta(seconds=unixtime)
