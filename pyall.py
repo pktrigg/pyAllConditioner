@@ -319,7 +319,7 @@ class UNKNOWN_RECORD:
 ###############################################################################
 class Y_SEABEDIMAGE:
     def __init__(self, fileptr, bytes):
-         self.TypeOfDatagram = 'Y'
+        self.TypeOfDatagram = 'Y'
         self.offset = fileptr.tell()
         self.bytes = bytes
         self.fileptr = fileptr
