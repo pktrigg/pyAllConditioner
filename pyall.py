@@ -78,8 +78,8 @@ def main():
             print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth)))
             pingCount += 1
 
-        # if TypeOfDatagram == 'Y':
-        #     datagram.read()
+        if TypeOfDatagram == 'Y':
+            datagram.read()
 
     print("Read Duration: %.3f seconds, pingCount %d" % (time.time() - start_time, pingCount)) # print the processing time. It is handy to keep an eye on processing performance.
 
@@ -328,13 +328,56 @@ class Y_SEABEDIMAGE:
     
     def read(self):
         self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHH'
+        rec_fmt = '=LBBHLLHHfHhhHHH'
         rec_len = struct.calcsize(rec_fmt)
         rec_unpack = struct.Struct(rec_fmt).unpack_from
         s = rec_unpack(self.fileptr.read(rec_len))
 
+        self.NumberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+        self.SampleFrequency   = s[8]
+        self.RangeToNormalIncidence   = s[9]
+        self.NormalIncidence   = s[10]
+        self.ObliqueBS   = s[11]
+        self.TxBeamWidth   = s[12]
+        self.TVGCrossOver   = s[13]
+        self.NumBeams   = s[14]
 
+        rec_fmt = '=bBHH'            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
 
+        beams = []
+
+        for i in range(self.NumBeams):            
+            s = rec_unpack(self.fileptr.read(rec_len))
+            b = beam(s)
+            beams.append(b)
+
+        rec_fmt = '=h'            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        for beam in beams:
+            data = rec_unpack(self.fileptr.read(rec_len))
+            beam.samples = data
+
+###############################################################################
+class beam:
+    def __init__(self, beamDetail):
+        self.sortingDirection       = beamDetail[0]
+        self.detectionInfo          = beamDetail[1]
+        self.sampleCount            = beamDetail[2]
+        self.centreSampleNumber     = beamDetail[3]
+        # self.sector                 = 0
+        # self.samples                = []
+
+        
 ###############################################################################
 class n_ATTITUDE:
     def __init__(self, fileptr, bytes):
