@@ -23,8 +23,8 @@ def main():
     filename =   "C:/Python27/ArcGIS10.3/pyall-master/0314_20170421_222154_SA1702-FE_302.all"
     # filename =   "C:/development/Python/m3Sample.all"
     # filename = "C:/development/python/0004_20110307_041009.all"
-    # filename = "C:/development/python/sample.all"
-    filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
+    filename = "C:/development/python/sample.all"
+    # filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
     r = ALLReader(filename)
     pingCount = 0
     start_time = time.time() # time the process
@@ -138,7 +138,7 @@ class ALLReader:
 
             NumberOfBytes   = s[0]
             STX             = s[1]
-            TypeOfDatagram  = s[2]
+            TypeOfDatagram  = chr(s[2])
             EMModel         = s[3]
             RecordDate      = s[4]
             RecordTime      = float(s[5]/1000.0)
@@ -171,35 +171,35 @@ class ALLReader:
     def readDatagram(self):
         # read the datagram header.  This permits us to skip datagrams we do not support
         NumberOfBytes, STX, TypeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
-        if TypeOfDatagram == 51: # 3_EXTRA PARAMETERS DECIMAL 51
+        if TypeOfDatagram == '3': # 3_EXTRA PARAMETERS DECIMAL 51
             dg = E_EXTRA(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 65: # A ATTITUDE
+        if TypeOfDatagram == 'A': # A ATTITUDE
             dg = A_ATTITUDE(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 67: # C Clock 
+        if TypeOfDatagram == 'C': # C Clock 
             dg = C_CLOCK(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 68: # D DEPTH
+        if TypeOfDatagram == 'D': # D DEPTH
             dg = D_DEPTH(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 73: # I Installation 
+        if TypeOfDatagram == 'I': # I Installation 
             # create a class for this datagram, but only decode if the resulting class is called by the user.  This makes it much faster
             dg = I_INSTALLATION(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 78: # N Angle and Travel Time
+        if TypeOfDatagram == 'N': # N Angle and Travel Time
             dg = N_TRAVELTIME(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 82: # R_RUNTIME
+        if TypeOfDatagram == 'R': # R_RUNTIME
             dg = R_RUNTIME(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 80: # P Position
+        if TypeOfDatagram == 'P': # P Position
             dg = P_POSITION(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 88: # X Depth
+        if TypeOfDatagram == 'X': # X Depth
             dg = X_DEPTH(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 110: # n ATTITUDE
+        if TypeOfDatagram == 'n': # n ATTITUDE
             dg = n_ATTITUDE(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
         else:
@@ -299,11 +299,10 @@ class ALLReader:
             return "B_BIST_Result"
 
 
-
-
+###############################################################################
 class UNKNOWN_RECORD:
     def __init__(self, fileptr, bytes, typeOfDatagram):
-        self.TypeOfDatagram = chr(typeOfDatagram)
+        self.TypeOfDatagram = typeOfDatagram
         self.offset = fileptr.tell()
         self.bytes = bytes
         self.fileptr = fileptr
@@ -312,6 +311,26 @@ class UNKNOWN_RECORD:
     def read(self):
         self.data = self.fileptr.read(self.bytes)
 
+###############################################################################
+class Y_SEABEDIMAGE:
+    def __init__(self, fileptr, bytes):
+        self.TypeOfDatagram = 'Y'
+        self.offset = fileptr.tell()
+        self.bytes = bytes
+        self.fileptr = fileptr
+        self.fileptr.seek(bytes, 1)
+        self.data = ""
+    
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+
+
+###############################################################################
 class n_ATTITUDE:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'n'
@@ -330,7 +349,7 @@ class n_ATTITUDE:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -385,6 +404,7 @@ class n_ATTITUDE:
 
             
 
+###############################################################################
 class A_ATTITUDE_WRITER:
     def __init__(self):
         print("")
@@ -425,6 +445,7 @@ class A_ATTITUDE_WRITER:
         
 
 
+###############################################################################
 class E_EXTRA:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = '3'
@@ -443,7 +464,7 @@ class E_EXTRA:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -470,6 +491,7 @@ class E_EXTRA:
         # now read the footer
         self.ETX, self.checksum = readFooter(self.NumberOfBytes, self.fileptr)
 
+###############################################################################
 class A_ATTITUDE:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'A'
@@ -488,7 +510,7 @@ class A_ATTITUDE:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -520,6 +542,7 @@ class A_ATTITUDE:
         self.checksum           = s[2]
 
     
+###############################################################################
 class D_DEPTH:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'D'
@@ -538,7 +561,7 @@ class D_DEPTH:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -606,6 +629,7 @@ class D_DEPTH:
         self.ETX                = s[1]
         self.checksum           = s[2]
 
+###############################################################################
 class X_DEPTH:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'X'
@@ -624,7 +648,7 @@ class X_DEPTH:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = s[5]/1000
@@ -684,6 +708,7 @@ class X_DEPTH:
         self.ETX                = s[1]
         self.checksum           = s[2]
 
+###############################################################################
 class R_RUNTIME:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'R'       # assign the KM code for this datagram type
@@ -703,7 +728,7 @@ class R_RUNTIME:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = s[5]/1000
@@ -740,6 +765,7 @@ class R_RUNTIME:
         self.checksum                       = s[34]
             
 
+###############################################################################
 class P_POSITION:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'P'       # assign the KM code for this datagram type
@@ -759,7 +785,7 @@ class P_POSITION:
         
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -806,6 +832,7 @@ def readFooter(NumberOfBytes, fileptr):
 
         return ETX, checksum
 
+###############################################################################
 class N_TRAVELTIME:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'N'
@@ -826,7 +853,7 @@ class N_TRAVELTIME:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -906,6 +933,7 @@ class N_TRAVELTIME:
         self.ETX                = s[1]
         self.checksum           = s[2]
 
+###############################################################################
 class I_INSTALLATION:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'I'       # assign the KM code for this datagram type
@@ -926,7 +954,7 @@ class I_INSTALLATION:
         
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -948,6 +976,8 @@ class I_INSTALLATION:
         if bytesRead < self.bytes:
             self.fileptr.read(int(self.bytes - bytesRead))
 
+
+###############################################################################
 class C_CLOCK:
     def __init__(self, fileptr, bytes):
         self.TypeOfDatagram = 'C'
@@ -967,7 +997,7 @@ class C_CLOCK:
 
         self.NumberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = s[2]
+        self.TypeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -1015,6 +1045,7 @@ def typecasting(crc):
 from ctypes import c_ulong
 
 
+###############################################################################
 class CRC32(object):
     crc32_tab = []
 
