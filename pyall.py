@@ -78,6 +78,9 @@ def main():
             print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth)))
             pingCount += 1
 
+        # if TypeOfDatagram == 'Y':
+        #     datagram.read()
+
     print("Read Duration: %.3f seconds, pingCount %d" % (time.time() - start_time, pingCount)) # print the processing time. It is handy to keep an eye on processing performance.
 
     r.rewind()
@@ -184,9 +187,11 @@ class ALLReader:
             dg = D_DEPTH(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
         if TypeOfDatagram == 'I': # I Installation 
-            # create a class for this datagram, but only decode if the resulting class is called by the user.  This makes it much faster
             dg = I_INSTALLATION(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
+        if TypeOfDatagram == 'n': # n ATTITUDE
+            dg = n_ATTITUDE(self.fileptr, NumberOfBytes)
+            return dg.TypeOfDatagram, dg
         if TypeOfDatagram == 'N': # N Angle and Travel Time
             dg = N_TRAVELTIME(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg
@@ -199,9 +204,9 @@ class ALLReader:
         if TypeOfDatagram == 'X': # X Depth
             dg = X_DEPTH(self.fileptr, NumberOfBytes)
             return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'n': # n ATTITUDE
-            dg = n_ATTITUDE(self.fileptr, NumberOfBytes)
-            return dg.TypeOfDatagram, dg
+        if TypeOfDatagram == 'Y': # Y_SeabedImage
+            dg = Y_SEABEDIMAGE(self.fileptr, NumberOfBytes)
+            return dg.TypeOfDatagram, dg 
         else:
             dg = UNKNOWN_RECORD(self.fileptr, NumberOfBytes, TypeOfDatagram)
             return dg.TypeOfDatagram, dg
