@@ -11,7 +11,19 @@ pyAllConditioner
 2DO
 ===
 Implement -inject <filename> to inject .srh delayed heave into the .all file.
+    read file for injection into memory with an essential time field
+    loop through input file
+        if input current datagram time is older than the top of the injection file, write out the raw bytes
+        if the top of the injection file is older than the current datagram, write out the injection record, and pop it from the list
+    close the input file
+    close the newly created file
 
+Backscatter conditioning:
+    load a corrections file into memory which contains a list of sectornumber, correction(dB) values
+    read the raw rang datagram and create a mean to sector lookup
+    read the seabedimage datagram
+    for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
+    write out the new datagram by modifying the raw bytes 
 Done
 ====
 Implement writing of the new file.  by default use append _1.all to make a new filename

@@ -13,7 +13,7 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-i", "C:/development/python/sample.all", "-j", "C:/development/python/pyAllConditioner/attitude.csv"]
+            "args": ["-i", "C:/development/python/sample_runtime.all", "-j", "C:/development/python/pyAllConditioner/attitude-2.csv"]
         }
    ]
 }

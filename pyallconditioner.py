@@ -27,6 +27,7 @@ def main():
     fileCounter=0
     matches = []
     inject = False
+    correctBackscatter = False
 
     if args.recursive:
         for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
@@ -66,15 +67,28 @@ def main():
             # read a datagram.  If we support it, return the datagram type and aclass for that datagram
             TypeOfDatagram, datagram = r.readDatagram()
 
+            if TypeOfDatagram is "C":
+                cclock = pyall.C_CLOCK(r.fileptr, datagram.numberOfBytes)
+                cclock.readWriteTester
+            # the user has opted to skip this datagram, so continue
+            if TypeOfDatagram in args.exclude:
+                continue
+
+            # read the bytes into a buffer 
+            rawBytes = r.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
+
             # before we write the datagram out, we need to inject records with a smaller from_timestamp
             if inject:    
                 injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), injectionData)
 
-            if TypeOfDatagram not in args.exclude:
-                # read the bytes into a buffer 
-                rawBytes = r.readDatagramBytes(datagram.offset, datagram.bytes)
-                # write the bytes to the new file
-                outFilePtr.write(rawBytes)
+            if correctBackscatter:
+                if TypeOfDatagram == 'N':
+                    datagram.read()
+                    # print ("Raw    Travel Times Recorded for %d beams" % datagram.NumReceiveBeams)
+
+            # write the bytes to the new file
+            print ("writing %s" % (r.currentRecordDateTime))
+            outFilePtr.write(rawBytes)
 
         update_progress("Processed: %s (%d/%d)" % (filename, fileCounter, len(matches)), (fileCounter/len(matches)))
         # lastTimeStamp = update[0]
@@ -87,16 +101,31 @@ def main():
 
 # inject data into the output file and pop the record from the injector
 def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injectionData):
-    while (float(injectionData[0][0]) <= currentRecordTimeStamp):
-        print("popping")
+    if len(injectionData) == 0:
+        return
+    i = 0
+    while (len(injectionData) and float(injectionData[0][0]) <= currentRecordTimeStamp)  > 0:
+        print("popping %d %.3f" % (i, float(injectionData[0][0]) - currentRecordTimeStamp))
         record = injectionData.pop(0)
         a = pyall.A_ATTITUDE_WRITER()
-        a.encode(recordDate, recordTime, float(record[1]), float(record[2]), float(record[3]), float(record[4]))
+        datagram = a.encode(recordDate, recordTime, float(record[1]), float(record[2]), float(record[3]), float(record[4]))
+        outFilePtr.write(datagram)
+        
+        i=i+1
+        
+
 def loadFileToInject(injectFileName):
     with open(injectFileName, 'r') as f:
         reader = csv.reader(f)
         injectionData = list(reader)
     return injectionData
+
+def loadBSCorrFile(injectFileName):
+    '''method to read a bscorr file into a list for processing.  The list will have the various modes and the corrections to apply to each sector'''
+    with open(injectFileName, 'r') as f:
+        reader = csv.reader(f)
+        BSCorr = list(reader)
+    return BSCorr
 
 def from_timestamp(unixtime):
     return datetime(1970, 1 ,1) + timedelta(seconds=unixtime)
