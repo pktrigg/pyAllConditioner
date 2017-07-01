@@ -13,8 +13,10 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-i", "C:/development/python/sample_runtime.all", "-j", "C:/development/python/pyAllConditioner/attitude-2.csv"]
+        "args": ["-i", "C:/development/python/sample.all", "-conditionbs", "ARC.csv"]
         }
    ]
 }
+        "args": ["-i", "C:/development/python/sample.all", "-extractbs"]
+            "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]
             // "args": ["-r","-i", "C:/development/"]

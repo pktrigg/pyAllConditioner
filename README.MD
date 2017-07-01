@@ -26,6 +26,11 @@ Backscatter conditioning:
     write out the new datagram by modifying the raw bytes 
 Done
 ====
+iterates through the Y seabedImage datagrams and writes out an angular response curve file in the format angle,response,sector
+the ARC is a sum of ALL input files and can be used as the basis to condition and improve (ie correct) the Y datagrams by applying a simplar CSV file in the format angle, response, sector, correction.  The correction fields are added to the y datagrams
+Improve wildcard and single file support
+Implement multiple record attitude injection
+Implement attitude injection
 Implement writing of the new file.  by default use append _1.all to make a new filename
 Implement -x <recordIdentifiers> to exclude records from the output, eg -x PA to remove the position (P) and attitude (A) records.  Note this needs to be case sensitive
 

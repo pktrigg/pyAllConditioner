@@ -130,7 +130,8 @@ class ALLReader:
 
     def from_timestamp(self, unixtime):
         '''return a python date object from a unix tiemstamp'''
-        return datetime(1970, 1 ,1) + timedelta(unixtime)
+        return datetime.utcfromtimestamp(unixtime)
+        # return datetime(1970, 1 ,1) + timedelta(unixtime)
 
     def close(self):
         '''close the current file'''
@@ -366,28 +367,31 @@ class Y_SEABEDIMAGE:
         self.TxBeamWidth   = s[12]
         self.TVGCrossOver   = s[13]
         self.NumBeams   = s[14]
+        self.beams = []
+        self.numSamples = 0
+        self.samples =[]
 
         rec_fmt = '=bBHH'            
         rec_len = struct.calcsize(rec_fmt)
         rec_unpack = struct.Struct(rec_fmt).unpack
 
-        beams = []
-        numSamples = 0
+        self.numSamples = 0
         for i in range(self.NumBeams):            
             s = rec_unpack(self.fileptr.read(rec_len))
-            b = cBeam(s)
-            numSamples = numSamples + b.sampleCount
-            beams.append(b)
+            b = cBeam(s, 0)
+            self.numSamples = self.numSamples + b.numberOfSamplesPerBeam
+            self.beams.append(b)
 
-        rec_fmt = '=' + str(numSamples) + 'h'            
+        rec_fmt = '=' + str(self.numSamples) + 'h'            
         rec_len = struct.calcsize(rec_fmt)
         rec_unpack = struct.Struct(rec_fmt).unpack
-        samples = rec_unpack(self.fileptr.read(rec_len))
+        self.samples = rec_unpack(self.fileptr.read(rec_len))
         
+        # allocate the samples to the correct beams so it is easier to use
         sampleIDX = 0
-        for b in beams:
-            b.samples = samples[sampleIDX:b.sampleCount]
-            sampleIDX = sampleIDX + b.sampleCount
+        for b in self.beams:
+            b.samples = self.samples[sampleIDX: sampleIDX + b.numberOfSamplesPerBeam] 
+            sampleIDX = sampleIDX + b.numberOfSamplesPerBeam
 
         # read an empty byte
         self.fileptr.read(1)        
@@ -396,16 +400,64 @@ class Y_SEABEDIMAGE:
         self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
 ###############################################################################
+    def encode(self):
+        '''Encode a seabed image datagram record'''
+
+        header_fmt = '=LBBHLL'
+        header_fmt = '=LBBHLLHHfHhhHHH'
+        header_len = struct.calcsize(header_fmt)
+
+        fullDatagram = bytearray()
+        
+        rec_fmt = '=bBHH'            
+        rec_len = struct.calcsize(rec_fmt)
+
+        sample_fmt = '=' + str(self.numSamples) + 'h'            
+        sample_len = struct.calcsize(sample_fmt)
+        
+        footer_fmt = '=BBH'
+        footer_len = struct.calcsize(footer_fmt)
+
+        fullDatagramByteCount = header_len + (rec_len*self.NumBeams) + sample_len + footer_len
+
+        # pack the header
+        recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, self.SampleFrequency, self.RangeToNormalIncidence, self.NormalIncidence, self.ObliqueBS, self.TxBeamWidth, self.TVGCrossOver, self.NumBeams)
+        fullDatagram = fullDatagram + header
+
+        # pack the beam summary info
+        for b in self.beams:
+            bodyRecord = struct.pack(rec_fmt, b.sortingDirection, b.detectionInfo, b.numberOfSamplesPerBeam, b.centreSampleNumber)
+            fullDatagram = fullDatagram + bodyRecord
+
+            s = list(self.samples)
+        for i in range(len(s)):
+            s[i] = 0            
+        # pack the actual seabed imagery
+        sampleRecord = struct.pack(sample_fmt, *s)
+        fullDatagram = fullDatagram + sampleRecord
+
+        # now pack the footer 
+        systemDescriptor = 1
+        ETX = 3
+        checksum = 0
+        footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+        fullDatagram = fullDatagram + footer
+
+        return fullDatagram
+
+###############################################################################
 class cBeam:
-    def __init__(self, beamDetail):
+    def __init__(self, beamDetail, angle):
         self.sortingDirection       = beamDetail[0]
         self.detectionInfo          = beamDetail[1]
-        self.sampleCount            = beamDetail[2]
+        self.numberOfSamplesPerBeam = beamDetail[2]
         self.centreSampleNumber     = beamDetail[3]
-        # self.sector                 = 0
-        # self.samples                = []
+        self.sector                 = 0
+        self.takeOffAngle           = angle
+        self.sampleSum              = 0
+        self.samples                = []
 
-        
 ###############################################################################
 class n_ATTITUDE:
     def __init__(self, fileptr, numberOfBytes):
@@ -461,77 +513,68 @@ class n_ATTITUDE:
         # now read the footer
         self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
-        # if self.numberOfBytes % 2 == 0:
-        #     rec_fmt = '=bBH'
-        #     rec_len = struct.calcsize(rec_fmt)
-        #     rec_unpack = struct.Struct(rec_fmt).unpack_from
-        #     data = self.fileptr.read(rec_len)
-        #     s = rec_unpack(data)
-        #     self.ETX                = s[0]
-        #     self.checksum           = s[1]
-        # else:
-        #     rec_fmt = '=BH'
-        #     rec_len = struct.calcsize(rec_fmt)
-        #     rec_unpack = struct.Struct(rec_fmt).unpack_from
-        #     data = self.fileptr.read(rec_len)
-        #     s = rec_unpack(data)
-        #     self.ETX                = s[1]
-        #     self.checksum           = s[2]
-
-            
-
 ###############################################################################
-class A_ATTITUDE_WRITER:
+class A_ATTITUDE_ENCODER:
     def __init__(self):
-        # print("")
         self.data = 0
 
-    def encode(self, recordDate, recordTime, roll, pitch, heave, heading):
-        # print("encoding")
-        # rec_fmt = '=LBBHLLHHH'
-        # rec_fmt = '=HHhhhH'            
-        # rec_fmt = '=BBH'
+    def encode(self, recordsToAdd, counter):
+        '''Encode a list of attitude records where the format is timestamp, rool, pitch, heave heading'''
+        if (len(recordsToAdd) == 0):
+            return
 
-        rec_fmt = '=LBBHLLHHHHHhhhHBBH'
-        # set model number via code rather than hardwire pkpk
-        bytes = struct.calcsize(rec_fmt)
+        fullDatagram = bytearray()
+
+        header_fmt = '=LBBHLLHHH'
+        header_len = struct.calcsize(header_fmt)
+
+        rec_fmt = "HHhhhH"
+        rec_len = struct.calcsize(rec_fmt)
+
+        footer_fmt = '=BBH'
+        footer_len = struct.calcsize(footer_fmt)
+
         STX = 2
         TypeOfDatagram = 65
         model = 2045
 
-        counter = 123
         serialNumber = 999
-        numEntries = 1
+        numEntries = len(recordsToAdd)
 
-        timeMillisecs = 456
-        sensorStatus = 37008
+        fullDatagramByteCount = header_len + (rec_len*len(recordsToAdd)) + footer_len
 
-        systemDescriptor = 9
-        ETX = 3
-        checksum = 9999
+        firstRecordTimestamp = float(recordsToAdd[0][0]) #we need to know the first reord timestamp as all observations are milliseconds from that time
+        firstRecordDate = from_timestamp(firstRecordTimestamp)
 
-        # buf = 
-        # rec_pack = struct.Struct(rec_fmt).pack_into(buffer, 0, numberOfBytes, STX, TypeOfDatagram, model, recordDate, int(recordTime*1000), counter, serialNumber, numEntries, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100), systemDescriptor, ETX, checksum)
-
+        recordDate = int(dateToKongsbergDate(firstRecordDate))
+        recordTime = int(dateToSecondsSinceMidnight(firstRecordDate)*1000)
         # we need to deduct 4 bytes as the field does not account for the 4-byte message length data which precedes the message
-        datagram = struct.pack(rec_fmt, bytes-4, STX, TypeOfDatagram, model, recordDate, int(recordTime*1000), counter, serialNumber, numEntries, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100), systemDescriptor, ETX, checksum)
-
-        return datagram
-
-        # crc = do_crc(datagram)
-        # print (len(datagram))
-        # # now do the record...
-        # rec_fmt = '=HHhhhH'            
-        # timeMillisecs = 0
-        # sensorStatus = 0
-        # record = struct.Struct.pack(rec_fmt, )
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, TypeOfDatagram, model, recordDate, recordTime, counter, serialNumber, numEntries)
+        fullDatagram = fullDatagram + header
         
-        # rec_fmt = '=BBH'
-        # systemDescriptor = 0
-        # ETX = 3
-        
+        # now pack avery record from the list
+        for record in recordsToAdd:
+            timeMillisecs = round((float(record[0]) - firstRecordTimestamp) * 1000) # compute the millisecond offset of the record from the first record in the datagram
+            sensorStatus = 0
+            roll    = float(record[1])
+            pitch   = float(record[2])
+            heave   = float(record[3])
+            heading = float(record[4])
+            bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
+            fullDatagram = fullDatagram + bodyRecord
 
+        # now do the footer 
+        systemDescriptor = 1
+        ETX = 3
+        checksum = 0
+        footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+        fullDatagram = fullDatagram + footer
 
+        # TEST THE CRC CODE pkpk
+        # c = CRC16()
+        # chk = c.calculate(fullDatagram)
+
+        return fullDatagram
 
 ###############################################################################
 class A_ATTITUDE:
@@ -580,6 +623,7 @@ class A_ATTITUDE:
         data = self.fileptr.read(rec_len)
         s = rec_unpack(data)
             
+        self.systemDescriptor  = s[0]
         self.ETX                = s[1]
         self.checksum           = s[2]
 
@@ -852,12 +896,6 @@ class R_RUNTIME:
         self.ETX                            = s[33]
         self.checksum                       = s[34]
             
-        # TEST THE CRC CODE pkpk
-        # c = CRC16()
-        # c = c.calculate(data[4:-2])
-        # print (self.checksum)
-
-        # c = crc16(data, 16)
 
 ###############################################################################
 class P_POSITION:
@@ -1102,35 +1140,16 @@ class C_CLOCK:
         self.ETX                = s[11]
         self.checksum           = s[12]
 
-        # c = CRC16()
-        # c = c.calculate(self.data[4:-2])
-        # print (self.checksum)
+def dateToSecondsSinceMidnight(dateObject):
+    return (dateObject - dateObject.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
 
-    def readWriteTester(self):
-        self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHLLBBH'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        # bytesRead = rec_len
-        s = rec_unpack(self.fileptr.read(rec_len))
+def from_timestamp(unixtime):
+    return datetime.utcfromtimestamp(unixtime)
+    # return datetime(1970, 1 ,1) + timedelta(unixtime)
 
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = float(s[5]/1000.0)
-        self.ClockCounter    = s[6]
-        self.SerialNumber    = s[7]
+def dateToKongsbergDate(dateObject):
+    return dateObject.strftime('%Y%m%d')
 
-        self.ExternalDate       = s[8]
-        self.ExternalTime       = s[9]
-        self.PPS                = s[10]
-        self.ETX                = s[11]
-        self.checksum           = s[12]
-
-        datagram = struct.pack(rec_fmt, self.numberOfBytes, self.STX, self.TypeOfDatagram, self.EMModel, self.RecordDate, int(self.RecordTime*1000), self.ClockCounter, self.SerialNumber, self.ExternalDate, self.ExternalTime, self.PPS,  self.ETX, self.checksum)
-        return  datagram
 ###############################################################################
 def crc16(data, bits=8):
     crc = 0xFFFF
@@ -1150,74 +1169,71 @@ def typecasting(crc):
 def to_timestamp(recordDate):
     return (recordDate - datetime(1970, 1, 1)).total_seconds()
 
-def from_timestamp(unixtime):
-    return datetime(1970, 1 ,1) + timedelta(unixtime)
+
+# # -*- coding: utf8 -*-
 
 
-# -*- coding: utf8 -*-
+# # CRC32 MODULE
 
 
-# CRC32 MODULE
+# from ctypes import c_ulong
 
 
-from ctypes import c_ulong
+# ###############################################################################
+# class CRC32(object):
+#     crc32_tab = []
+
+#     # The CRC's are computed using polynomials. Here is the most used
+#     # coefficient for CRC32
+#     crc32_constant = 0xEDB88320
+
+#     def __init__(self):
+#         # initialize the precalculated tables
+#         if not len(self.crc32_tab):
+#             self.init_crc32()
+
+#     def calculate(self, input_data=None):
+#         try:
+#             is_string = isinstance(input_data, str)
+#             is_bytes = isinstance(input_data, (bytes, bytearray))
+
+#             if not is_string and not is_bytes:
+#                 raise Exception("Please provide a string or a byte sequence as \
+#                     argument for calculation.")
+
+#             crc_value = 0xffffffff
+
+#             for c in input_data:
+#                 d = ord(c) if is_string else c
+#                 tmp = crc_value ^ d
+#                 crc_value = (crc_value >> 8) ^ self.crc32_tab[(tmp & 0x00ff)]
+
+#             # Only for CRC-32: When all bytes have been processed, take the
+#             # one's complement of the obtained CRC value
+#             crc_value ^= 0xffffffff  # (or crcValue = ~crcValue)
+
+#             return crc_value
+#         except Exception as e:
+#             print("EXCEPTION(calculate): {}".format(e))
+
+#     def init_crc32(self):
+#         """The algorithm use tables with precalculated values"""
+#         for i in range(0, 256):
+#             crc = i
+#             for j in range(0, 8):
+#                 if crc & 0x00000001:
+#                     crc = int(c_ulong(crc >> 1).value) ^ self.crc32_constant
+#                 else:
+#                     crc = int(c_ulong(crc >> 1).value)
+
+#             self.crc32_tab.append(crc)
+
+# # -*- coding: utf8 -*-
 
 
-###############################################################################
-class CRC32(object):
-    crc32_tab = []
+# # CRC16 MODULE
 
-    # The CRC's are computed using polynomials. Here is the most used
-    # coefficient for CRC32
-    crc32_constant = 0xEDB88320
-
-    def __init__(self):
-        # initialize the precalculated tables
-        if not len(self.crc32_tab):
-            self.init_crc32()
-
-    def calculate(self, input_data=None):
-        try:
-            is_string = isinstance(input_data, str)
-            is_bytes = isinstance(input_data, (bytes, bytearray))
-
-            if not is_string and not is_bytes:
-                raise Exception("Please provide a string or a byte sequence as \
-                    argument for calculation.")
-
-            crc_value = 0xffffffff
-
-            for c in input_data:
-                d = ord(c) if is_string else c
-                tmp = crc_value ^ d
-                crc_value = (crc_value >> 8) ^ self.crc32_tab[(tmp & 0x00ff)]
-
-            # Only for CRC-32: When all bytes have been processed, take the
-            # one's complement of the obtained CRC value
-            crc_value ^= 0xffffffff  # (or crcValue = ~crcValue)
-
-            return crc_value
-        except Exception as e:
-            print("EXCEPTION(calculate): {}".format(e))
-
-    def init_crc32(self):
-        """The algorithm use tables with precalculated values"""
-        for i in range(0, 256):
-            crc = i
-            for j in range(0, 8):
-                if crc & 0x00000001:
-                    crc = int(c_ulong(crc >> 1).value) ^ self.crc32_constant
-                else:
-                    crc = int(c_ulong(crc >> 1).value)
-
-            self.crc32_tab.append(crc)
-
-# -*- coding: utf8 -*-
-
-
-# CRC16 MODULE
-
-# includes CRC16 and CRC16 MODBUS
+# # includes CRC16 and CRC16 MODBUS
 
 
 from ctypes import c_ushort
@@ -1266,9 +1282,9 @@ class CRC16(object):
                     crc = c_ushort(crc >> 1).value
             self.crc16_tab.append(crc)
 
-# def do_crc(s):
-#     n = zlib.crc32(s)
-#     return n & 0xffffffff
+# # def do_crc(s):
+# #     n = zlib.crc32(s)
+# #     return n & 0xffffffff
 
 if __name__ == "__main__":
         main()
