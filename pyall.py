@@ -344,7 +344,8 @@ class Y_SEABEDIMAGE:
         self.fileptr = fileptr
         self.fileptr.seek(numberOfBytes, 1)
         self.data = ""
-    
+        self.ARC = []
+        
     def read(self):
         self.fileptr.seek(self.offset, 0)
         rec_fmt = '=LBBHLLHHfHhhHHH'
@@ -430,7 +431,8 @@ class Y_SEABEDIMAGE:
             bodyRecord = struct.pack(rec_fmt, b.sortingDirection, b.detectionInfo, b.numberOfSamplesPerBeam, b.centreSampleNumber)
             fullDatagram = fullDatagram + bodyRecord
 
-            s = list(self.samples)
+        # now add the ARC correction based on the take off angles 
+        s = list(self.samples)
         for i in range(len(s)):
             s[i] = 0            
         # pack the actual seabed imagery

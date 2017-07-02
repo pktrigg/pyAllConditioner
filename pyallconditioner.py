@@ -132,6 +132,7 @@ def main():
                     transmitSector = datagram.TransmitSectorNumber
                 if TypeOfDatagram == 'Y':
                     datagram.read()
+                    datagram.ARC = ARC
                     bytes = datagram.encode()
                     outFilePtr.write(bytes)
                     
