@@ -344,7 +344,8 @@ class Y_SEABEDIMAGE:
         self.fileptr = fileptr
         self.fileptr.seek(numberOfBytes, 1)
         self.data = ""
-    
+        self.ARC = []
+        
     def read(self):
         self.fileptr.seek(self.offset, 0)
         rec_fmt = '=LBBHLLHHfHhhHHH'
@@ -430,7 +431,8 @@ class Y_SEABEDIMAGE:
             bodyRecord = struct.pack(rec_fmt, b.sortingDirection, b.detectionInfo, b.numberOfSamplesPerBeam, b.centreSampleNumber)
             fullDatagram = fullDatagram + bodyRecord
 
-            s = list(self.samples)
+        # now add the ARC correction based on the take off angles 
+        s = list(self.samples)
         for i in range(len(s)):
             s[i] = 0            
         # pack the actual seabed imagery
@@ -556,15 +558,15 @@ class A_ATTITUDE_ENCODER:
         for record in recordsToAdd:
             timeMillisecs = round((float(record[0]) - firstRecordTimestamp) * 1000) # compute the millisecond offset of the record from the first record in the datagram
             sensorStatus = 0
-            roll    = float(record[1])
-            pitch   = float(record[2])
-            heave   = float(record[3])
+            roll    = 0.0 #float(record[1])
+            pitch   = 0.0 #float(record[2])
+            heave   = float(record[3]) * -10
             heading = float(record[4])
             bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
             fullDatagram = fullDatagram + bodyRecord
 
         # now do the footer 
-        systemDescriptor = 1
+        systemDescriptor = 30
         ETX = 3
         checksum = 0
         footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
