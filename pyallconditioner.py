@@ -83,7 +83,7 @@ def main():
         injectionData = loadCSVFile(args.SRHInjectFileName)
         inject = True
         # auto exclude attitude records
-        args.exclude = 'nA'
+        args.exclude = 'n'
         print ("SRH Injector will strip 'n' and 'A' attitude records while injecting %s" % args.SRHInjectFileName)
 
     for filename in matches:
