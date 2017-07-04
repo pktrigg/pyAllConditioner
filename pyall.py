@@ -560,8 +560,8 @@ class A_ATTITUDE_ENCODER:
             sensorStatus = 0
             roll    = 0.0 #float(record[1])
             pitch   = 0.0 #float(record[2])
-            heave   = float(record[3]) * -10
-            heading = float(record[4])
+            heave   = float(record[1]) # heave in m
+            heading = 0.0 # float(record[4])
             bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
             fullDatagram = fullDatagram + bodyRecord
 

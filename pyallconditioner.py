@@ -13,6 +13,7 @@ import struct
 from bisect import bisect_left, bisect_right
 import sortedcollection
 from operator import itemgetter
+from collections import deque
 
 ###############################################################################
 def main():
@@ -20,7 +21,7 @@ def main():
             epilog='Example: \n To condition a single file use -i c:/temp/myfile.all \n to condition all files in a folder use -i c:/temp/*.all\n To condition all .all files recursively in a folder, use -r -i c:/temp \n To condition all .all files recursively from the current folder, use -r -i ./ \n', formatter_class=RawTextHelpFormatter)
     parser.add_argument('-i', dest='inputFile', action='store', help='-i <ALLfilename> : Input ALL filename to image. It can also be a wildcard, e.g. *.all')
     parser.add_argument('-exclude', dest='exclude', action='store', default="", help='-exclude <datagramsID[s]> : eXclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
-    parser.add_argument('-srh', dest='SRHInjectFileName', action='store', default="", help='-srh <filename> : inJect this attitude file as A datagrams.  This will automatically remove existing A_ATTITUDE and n_NetworkAttitude datagrams. e.g. -srh delayedHeave.srh')
+    parser.add_argument('-srh', dest='SRHInjectFileName', action='store', default="", help='-srh <filename[s]> : inJect this attitude file as A datagrams.  This will automatically remove existing A_ATTITUDE and n_NetworkAttitude datagrams. e.g. -srh "*.srh" (Hint: remember the quotes!)')
     parser.add_argument('-conditionbs', dest='conditionbs', action='store', default="", help='-conditionbs <filename> : improve the Y_SeabedImage datagrams by adding a CSV correction file. eg. -conditionbs c:\angularResponse.csv')
     parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='-extractbs : extract backscatter from Y datagram so we can analyse. [Default: False]')
     parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='-r : search Recursively.  [Default: False]')
@@ -82,14 +83,12 @@ def main():
     # the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
     if len(args.SRHInjectFileName) > 0:
         inject = True
-        if not os.path.exists(args.SRHInjectFileName):
-            print ("oops: Injection filename does not exist, please try again: %s" % args.SRHInjectFileName)
-            exit()
-        SRH = SRHReader()
-        SRH.loadFile(args.SRHInjectFileName)
-        # auto exclude attitude records
         print ("SRH Injector will strip 'n' attitude records while injecting %s" % args.SRHInjectFileName)
         print ("SRH Injector will inject system 2 'A' records as an inactive attitude data sensor with empty pitch,roll and heading datap")
+        SRH = SRHReader()
+        SRH.loadFiles(args.SRHInjectFileName) # load all the filenames
+        print ("Records to inject: %d" % len(SRH.SRHData))
+        # auto exclude attitude records
         args.exclude = 'n'
 
     for filename in matches:
@@ -105,6 +104,13 @@ def main():
         r = pyall.ALLReader(filename)
         start_time = time.time() # time  the process
 
+        if inject:                    
+            TypeOfDatagram, datagram = r.readDatagram()
+            # kill off the leading records so we do not swamp the filewith unwanted records
+            SRHSubset = deque(SRH.SRHData)
+            SRHSubset = trimInjectionData(r.to_timestamp(r.currentRecordDateTime()), SRHSubset)
+            r.rewind()
+
         while r.moreData():
             # read a datagram.  If we support it, return the datagram type and aclass for that datagram
             TypeOfDatagram, datagram = r.readDatagram()
@@ -113,9 +119,11 @@ def main():
             rawBytes = r.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
 
             # before we write the datagram out, we need to inject records with a smaller from_timestamp
-            if inject:    
-                injectionData = SRH.SRHData
-                counter = injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), injectionData, counter)
+            if inject:                    
+                if TypeOfDatagram in args.exclude:
+                    # dont trigger on records we are rejecting!        
+                    continue
+                counter = injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
 
             if extractBackscatter:
                 '''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
@@ -168,6 +176,17 @@ def main():
         print ("Saving conditioned file to: %s" % outFileName)        
         outFilePtr.close()
 
+
+def trimInjectionData(recordTimestamp, SRHData):
+    print ("Trimming unwanted records up to 1 second before start of .all file timestamp..." )
+    i=0
+    while ((len(SRHData) > 0) and (recordTimestamp - SRHData[0][0]) > 1.0):
+        SRHData.popleft()
+        i=i+1
+    
+    print ("Records trimmed:%d" % i )
+    return SRHData
+
 ###############################################################################
 def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injectionData, counter):
     '''inject data into the output file and pop the record from the injector'''
@@ -175,7 +194,7 @@ def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injecti
         return
     recordsToAdd = []
     while ((len(injectionData) > 0) and (float(injectionData[0][0]) <= currentRecordTimeStamp)):
-        recordsToAdd.append(injectionData.pop(0))
+        recordsToAdd.append(injectionData.popleft())
     
     if len(recordsToAdd) > 0:
         counter = counter + 1
@@ -251,9 +270,27 @@ class SRHReader:
         self.SRHPacket_fmt = '>HBBLHhBH'  #pfreeheave is big endian format
         self.SRHPacket_len = struct.calcsize(self.SRHPacket_fmt)
         self.SRHPacket_unpack = struct.Struct(self.SRHPacket_fmt).unpack_from
-        self.SRHData = []
+        self.SRHData = deque()
 
-    def loadFile(self, filename):
+    def loadFiles(self, filename):
+        matches = []
+        if os.path.exists(filename):
+            matches.append (os.path.abspath(filename))
+        else:
+            for f in sorted(glob(filename)):
+                matches.append(f)
+        print (matches)
+
+        if len(matches) == 0:
+            print ("Nothing found in %s to condition, quitting" % filename)
+            exit()
+        print ("Loading SRH Files:")
+        for f in matches:
+            self.loadfile(f)
+        return
+
+    def loadfile(self, filename):
+
         if not os.path.isfile(filename):
             print ("SRH file not found:", filename)
             return
@@ -261,7 +298,7 @@ class SRHReader:
         fileSize = os.path.getsize(filename)
         # self.sc = sortedcollection.SortedCollection(key=itemgetter(0))
         # numberRecords = int(fileSize / self.SRHPacket_len)
-
+        print (filename)
         try:
             while True:
                 data = fileptr.read(self.SRHPacket_len)

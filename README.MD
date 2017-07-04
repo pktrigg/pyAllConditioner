@@ -28,7 +28,8 @@ Backscatter conditioning:
     write out the new datagram by modifying the raw bytes 
 Done
 ====
-SRH decode is now operational
+use glob to permit multiple SRH files to be imported for injection using a sorted wildcard
+SRH decode is now operational, and tested against Kongsberg sample data
 iterates through the Y seabedImage datagrams and writes out an angular response curve file in the format angle,response,sector
 the ARC is a sum of ALL input files and can be used as the basis to condition and improve (ie correct) the Y datagrams by applying a simplar CSV file in the format angle, response, sector, correction.  The correction fields are added to the y datagrams
 Improve wildcard and single file support
