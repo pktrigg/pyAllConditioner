@@ -13,10 +13,11 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]
+            "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/SRH_20161001_1475316490.srh"]
         }
    ]
 }
+            "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]
         "args": ["-i", "C:/development/python/sample.all", "-conditionbs", "ARC.csv"]
         "args": ["-i", "C:/development/python/sample.all", "-extractbs"]
             // "args": ["-r","-i", "C:/development/"]

@@ -10,6 +10,8 @@ pyAllConditioner
 
 2DO
 ===
+SRH needs to import multiple SRH files and sort them into a sensible order
+
 Implement -inject <filename> to inject .srh delayed heave into the .all file.
     read file for injection into memory with an essential time field
     loop through input file
@@ -26,6 +28,7 @@ Backscatter conditioning:
     write out the new datagram by modifying the raw bytes 
 Done
 ====
+SRH decode is now operational
 iterates through the Y seabedImage datagrams and writes out an angular response curve file in the format angle,response,sector
 the ARC is a sum of ALL input files and can be used as the basis to condition and improve (ie correct) the Y datagrams by applying a simplar CSV file in the format angle, response, sector, correction.  The correction fields are added to the y datagrams
 Improve wildcard and single file support
@@ -50,4 +53,15 @@ output
 ------
 ```
 A new .all file with modified as per the command line switches
+```
+
+Data Type Conversions from ALL to Python::     
+    * ALL types to python struct types
+    * signed char = 1 byte = "b"
+    * UNSIGNED char = 1 byte = "B"
+    * XTFWORD = signed int 2 bytes = h
+    * XTFWORD = UNSIGNED int 2 bytes = H (for unipolar data)
+    * short = short integer 2 bytes = "h"
+    * DWORD = unsigned int 4 bytes = "L"
+    * char = 1 byte = "c"
 ```

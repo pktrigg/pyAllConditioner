@@ -9,6 +9,10 @@ from datetime import datetime
 from datetime import timedelta
 from glob import glob
 import pyall
+import struct
+from bisect import bisect_left, bisect_right
+import sortedcollection
+from operator import itemgetter
 
 ###############################################################################
 def main():
@@ -58,7 +62,7 @@ def main():
         if not os.path.exists(args.conditionbs):
             print ("oops: backscatter conditioning filename does not exist, please try again: %s" % args.conditionbs)
             exit()
-        backscatterConditionData = loadCSVFile(args.conditionbs)
+        ARC = loadCSVFile(args.conditionbs)
         print ("Conditioning Y_SeabedImage datagrams with: %s :" % args.conditionbs)
         conditionBS = True
         args.exclude = 'Y' # we need to NOT write out the original data as we will be creating new records
@@ -77,14 +81,16 @@ def main():
 
     # the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
     if len(args.SRHInjectFileName) > 0:
+        inject = True
         if not os.path.exists(args.SRHInjectFileName):
             print ("oops: Injection filename does not exist, please try again: %s" % args.SRHInjectFileName)
             exit()
-        injectionData = loadCSVFile(args.SRHInjectFileName)
-        inject = True
+        SRH = SRHReader()
+        SRH.loadFile(args.SRHInjectFileName)
         # auto exclude attitude records
+        print ("SRH Injector will strip 'n' attitude records while injecting %s" % args.SRHInjectFileName)
+        print ("SRH Injector will inject system 2 'A' records as an inactive attitude data sensor with empty pitch,roll and heading datap")
         args.exclude = 'n'
-        print ("SRH Injector will strip 'n' and 'A' attitude records while injecting %s" % args.SRHInjectFileName)
 
     for filename in matches:
 
@@ -108,6 +114,7 @@ def main():
 
             # before we write the datagram out, we need to inject records with a smaller from_timestamp
             if inject:    
+                injectionData = SRH.SRHData
                 counter = injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), injectionData, counter)
 
             if extractBackscatter:
@@ -177,6 +184,17 @@ def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injecti
         outFilePtr.write(datagram)
     return counter
 
+# ###############################################################################
+# def loadSRHFile(fileName):
+#     '''the SRH file format is the KOngsberg PFreeHeave binary file format'''
+#     with open(fileName, 'r') as f:
+#         ALLPacketHeader_fmt = '=LBBHLL'
+#         ALLPacketHeader_len = struct.calcsize(ALLPacketHeader_fmt)
+#         ALLPacketHeader_unpack = struct.Struct(ALLPacketHeader_fmt).unpack_from
+#             reader = csv.reader(f)
+#             data = list(reader)
+#     return data
+
 ###############################################################################
 def loadCSVFile(fileName):
     with open(fileName, 'r') as f:
@@ -224,6 +242,45 @@ def createOutputFileName(path):
              index    += 1
      return os.path.join(dir,candidate)
 
+
+###############################################################################
+class SRHReader:
+    '''class to read a Kongsberg SRH PFreeHeave file'''
+    '''This class may need to read multiple SRH files, merge them, sort and provide rapid access using the bisect tools in python'''
+    def __init__(self):
+        self.SRHPacket_fmt = '>HBBLHhBH'  #pfreeheave is big endian format
+        self.SRHPacket_len = struct.calcsize(self.SRHPacket_fmt)
+        self.SRHPacket_unpack = struct.Struct(self.SRHPacket_fmt).unpack_from
+        self.SRHData = []
+
+    def loadFile(self, filename):
+        if not os.path.isfile(filename):
+            print ("SRH file not found:", filename)
+            return
+        fileptr = open(filename, 'rb')        
+        fileSize = os.path.getsize(filename)
+        # self.sc = sortedcollection.SortedCollection(key=itemgetter(0))
+        # numberRecords = int(fileSize / self.SRHPacket_len)
+
+        try:
+            while True:
+                data = fileptr.read(self.SRHPacket_len)
+                if not data: break
+                s = self.SRHPacket_unpack(data)
+                timestamp = float(s[3]) + (s[4] * 0.0001)
+                heave = float(s[5]) * 0.01
+                self.SRHData.append([timestamp, heave])
+                # print (from_timestamp(timestamp), heave)
+        except struct.error:
+            print ("Exception loading SRH file.  Will process as much as can be read")
+
+    # def swap32(self, i):
+    #     return struct.unpack("<I", struct.pack(">I", i))[0]
+    # def swap16(self, i):
+    #     return struct.unpack("<H", struct.pack(">H", i))[0]
+
+# def swap32(self, x):
+#         return int.from_bytes(x.to_bytes(4, byteorder='little'), byteorder='big', signed=False)
 ###############################################################################
 if __name__ == "__main__":
     main()
