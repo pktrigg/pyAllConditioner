@@ -96,13 +96,12 @@ def main():
         if writeConditionedFile:
             # create an output file based on the input
             outFileName  = createOutputFileName(filename)
-            outFilePtr = open(outFileName, 'bw')
+            outFilePtr = open(outFileName, 'wb')
             print ("writing to file: %s" % outFileName)
 
         counter = 0
         
         r = pyall.ALLReader(filename)
-        start_time = time.time() # time  the process
 
         if inject:                    
             TypeOfDatagram, datagram = r.readDatagram()
@@ -125,6 +124,10 @@ def main():
                     continue
                 counter = injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
 
+                if TypeOfDatagram == 'X':
+                    datagram.read()
+                    # now encode the datagram back, making changes along the way
+                    datagram.encode()
             if extractBackscatter:
                 '''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
                 '''to do this, we need to take into account the take off angle of each beam'''
@@ -178,7 +181,7 @@ def main():
 
 
 def trimInjectionData(recordTimestamp, SRHData):
-    print ("Trimming unwanted records up to 1 second before start of .all file timestamp..." )
+    print ("Trimming unwanted records up to 1 second before start of .all first record timestamp..." )
     i=0
     while ((len(SRHData) > 0) and (recordTimestamp - SRHData[0][0]) > 1.0):
         SRHData.popleft()
@@ -320,4 +323,6 @@ class SRHReader:
 #         return int.from_bytes(x.to_bytes(4, byteorder='little'), byteorder='big', signed=False)
 ###############################################################################
 if __name__ == "__main__":
+    start_time = time.time() # time  the process
     main()
+    print("Duration: %d seconds" % (time.time() - start_time))

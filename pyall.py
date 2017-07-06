@@ -404,7 +404,6 @@ class Y_SEABEDIMAGE:
     def encode(self):
         '''Encode a seabed image datagram record'''
 
-        header_fmt = '=LBBHLL'
         header_fmt = '=LBBHLLHHfHhhHHH'
         header_len = struct.calcsize(header_fmt)
 
@@ -560,7 +559,7 @@ class A_ATTITUDE_ENCODER:
             sensorStatus = 0
             roll    = 0.0 #float(record[1])
             pitch   = 0.0 #float(record[2])
-            heave   = float(record[1]) # heave in m
+            heave   = float(record[1]) * 10 # heave in m
             heading = 0.0 # float(record[4])
             bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
             fullDatagram = fullDatagram + bodyRecord
@@ -796,7 +795,9 @@ class X_DEPTH:
         self.NValidDetections       = s[12]
         self.SamplingFrequency      = s[13]
         self.ScanningInfo           = s[14]
-        self.spare                  = s[15]
+        self.spare1                 = s[15]
+        self.spare2                 = s[16]
+        self.spare3                 = s[17]
 
         self.Depth                        = [0 for i in range(self.NBeams)]
         self.AcrossTrackDistance          = [0 for i in range(self.NBeams)]
@@ -841,6 +842,44 @@ class X_DEPTH:
             
         self.ETX                = s[1]
         self.checksum           = s[2]
+
+###############################################################################
+    def encode(self):
+        '''Encode a Depth XYZ datagram record'''
+
+        header_fmt = '=LBBHLL4Hf2Hf4B'
+        header_len = struct.calcsize(header_fmt)
+
+        fullDatagram = bytearray()
+
+        rec_fmt = '=fffHBBBbh'            
+        rec_len = struct.calcsize(rec_fmt)
+       
+        footer_fmt = '=BBH'
+        footer_len = struct.calcsize(footer_fmt)
+
+        fullDatagramByteCount = header_len + (rec_len*self.NBeams) + footer_len
+
+        # pack the header
+        recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.NBeams, self.NValidDetections, self.SamplingFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3, self.spare3)
+        fullDatagram = fullDatagram + header
+
+
+        # pack the beam summary info
+        for b in self.NBeams:
+            bodyRecord = struct.pack(rec_fmt, self.Depth[i], self.AcrossTrackDistance[i], self.AlongTrackDistance[i], self.DetectionWindowsLength[i], self.QualityFactor[i], self.BeamIncidenceAngleAdjustment[i]*10, self.DetectionInformation[i], self.RealtimeCleaningInformation[i], self.Reflectivity[i]*10, )
+            fullDatagram = fullDatagram + bodyRecord
+
+        # now pack the footer 
+        systemDescriptor = 1
+        ETX = 3
+        checksum = 0
+        footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+        fullDatagram = fullDatagram + footer
+
+        return fullDatagram
+
 
 ###############################################################################
 class R_RUNTIME:

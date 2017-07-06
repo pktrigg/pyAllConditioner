@@ -13,7 +13,7 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-i", "C:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "C:/development/python/pyAllConditioner/*.srh"]
+            "args": ["-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "d:/projects/RVInvestigator/*.srh"]
         }
    ]
 }
