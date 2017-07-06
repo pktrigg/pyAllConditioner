@@ -23,6 +23,7 @@ def main():
     parser.add_argument('-exclude', dest='exclude', action='store', default="", help='-exclude <datagramsID[s]> : eXclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
     parser.add_argument('-srh', dest='SRHInjectFileName', action='store', default="", help='-srh <filename[s]> : inJect this attitude file as A datagrams.  This will automatically remove existing A_ATTITUDE and n_NetworkAttitude datagrams. e.g. -srh "*.srh" (Hint: remember the quotes!)')
     parser.add_argument('-conditionbs', dest='conditionbs', action='store', default="", help='-conditionbs <filename> : improve the Y_SeabedImage datagrams by adding a CSV correction file. eg. -conditionbs c:\angularResponse.csv')
+    parser.add_argument('-odir', dest='odir', action='store', default="", help='-odir <folder> : specify a relative output folder e.g. -odir conditioned')
     parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='-extractbs : extract backscatter from Y datagram so we can analyse. [Default: False]')
     parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='-r : search Recursively.  [Default: False]')
     if len(sys.argv)==1:
@@ -78,7 +79,7 @@ def main():
         transmitSector = []
         writeConditionedFile = False # we dont need to write a conditioned .all file
         outFileName = os.path.join(os.path.dirname(os.path.abspath(matches[0])), "AngularResponseCurve.csv")
-        outFileName = createOutputFileName(outFileName)
+        outFileName = createOutputFileName(outFileName, args.odir)
 
     # the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
     if len(args.SRHInjectFileName) > 0:
@@ -95,7 +96,7 @@ def main():
 
         if writeConditionedFile:
             # create an output file based on the input
-            outFileName  = createOutputFileName(filename)
+            outFileName  = createOutputFileName(filename, args.odir)
             outFilePtr = open(outFileName, 'wb')
             print ("writing to file: %s" % outFileName)
 
@@ -124,10 +125,15 @@ def main():
                     continue
                 counter = injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
 
+                # this is a testbed until we figure out how caris handles the application of heave.
                 if TypeOfDatagram == 'X':
                     datagram.read()
                     # now encode the datagram back, making changes along the way
-                    datagram.encode()
+                    datagram.TransducerDepth = 0 
+                    dg = datagram.encode()
+                    outFilePtr.write(dg)
+                    continue #we do not want to write the records twice!
+
             if extractBackscatter:
                 '''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
                 '''to do this, we need to take into account the take off angle of each beam'''
@@ -246,7 +252,7 @@ def update_progress(job_title, progress):
     sys.stdout.flush()
 
 ###############################################################################
-def createOutputFileName(path):
+def createOutputFileName(path, odir):
      '''Create a valid output filename. if the name of the file already exists the file name is auto-incremented.'''
      path      = os.path.expanduser(path)
 
@@ -262,7 +268,10 @@ def createOutputFileName(path):
      while candidate in ls:
              candidate = "{}_{}{}".format(fname,index,ext)
              index    += 1
-     return os.path.join(dir,candidate)
+     if not os.path.exists(os.path.join(dir, odir)):
+         os.makedirs(os.path.join(dir, odir))
+
+     return os.path.join(dir, odir, candidate)
 
 
 ###############################################################################

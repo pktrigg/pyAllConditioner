@@ -23,7 +23,7 @@ def main():
     filename =   "C:/Python27/ArcGIS10.3/pyall-master/0314_20170421_222154_SA1702-FE_302.all"
     # filename =   "C:/development/Python/m3Sample.all"
     # filename = "C:/development/python/0004_20110307_041009.all"
-    filename = "C:/development/python/sample.all"
+    # filename = "C:/development/python/sample.all"
     # filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
     r = ALLReader(filename)
     pingCount = 0
@@ -862,13 +862,12 @@ class X_DEPTH:
 
         # pack the header
         recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.NBeams, self.NValidDetections, self.SamplingFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3, self.spare3)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.TransducerDepth, self.NBeams, self.NValidDetections, self.SamplingFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3)
         fullDatagram = fullDatagram + header
 
-
         # pack the beam summary info
-        for b in self.NBeams:
-            bodyRecord = struct.pack(rec_fmt, self.Depth[i], self.AcrossTrackDistance[i], self.AlongTrackDistance[i], self.DetectionWindowsLength[i], self.QualityFactor[i], self.BeamIncidenceAngleAdjustment[i]*10, self.DetectionInformation[i], self.RealtimeCleaningInformation[i], self.Reflectivity[i]*10, )
+        for i in range (self.NBeams):
+            bodyRecord = struct.pack(rec_fmt, self.Depth[i], self.AcrossTrackDistance[i], self.AlongTrackDistance[i], self.DetectionWindowsLength[i], self.QualityFactor[i], int(self.BeamIncidenceAngleAdjustment[i]*10), self.DetectionInformation[i], self.RealtimeCleaningInformation[i], int(self.Reflectivity[i]*10), )
             fullDatagram = fullDatagram + bodyRecord
 
         # now pack the footer 

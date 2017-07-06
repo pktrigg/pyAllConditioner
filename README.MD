@@ -3,15 +3,26 @@ pyAllConditioner
 * created:          November 2016
 * version           1.0
 * by:               p.kennedy@fugro.com
-* description:      python module to read and write a Kongsberg .ALL file making modifications along the way
+* description:      python module to read and write a Kongsberg .ALL file making subtle modifications along the way
 * notes:            See main at end of script for example how to use this
 * based on ALL file version October 2013 
 * developed for Python version 3.4 + 2.7
 
 2DO
 ===
-SRH needs to import multiple SRH files and sort them into a sensible order
+Backscatter conditioning:
+    load a corrections file into memory which contains a list of sectornumber, correction(dB) values
+    read the raw rang datagram and create a mean to sector lookup
+    read the seabedimage datagram
+    for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
+    write out the new datagram by modifying the raw bytes 
 
+implement -splitdepthmode
+implement -splitsize
+implement -splitduration
+
+Done
+====
 Implement -inject <filename> to inject .srh delayed heave into the .all file.
     read file for injection into memory with an essential time field
     loop through input file
@@ -19,15 +30,9 @@ Implement -inject <filename> to inject .srh delayed heave into the .all file.
         if the top of the injection file is older than the current datagram, write out the injection record, and pop it from the list
     close the input file
     close the newly created file
-
-Backscatter conditioning:
-    load a corrections file into memory which contains a list of sectornumber, correction(dB) values
-    read the raw rang datagram and create a mean to sector lookup
-    read the seabedimage datagram
-    for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
-    write out the new datagram by modifying the raw bytes 
-Done
-====
+added support for odir so we can keep the output in a different folder.
+encode for X records.
+SRH needs to import multiple SRH files and sort them into a sensible order
 use glob to permit multiple SRH files to be imported for injection using a sorted wildcard
 SRH decode is now operational, and tested against Kongsberg sample data
 iterates through the Y seabedImage datagrams and writes out an angular response curve file in the format angle,response,sector
