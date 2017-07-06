@@ -169,10 +169,6 @@ def main():
             if extractSVP:
                 if TypeOfDatagram == 'U':
                     datagram.read()
-                    print ("Depth, SpeedSound")
-                    for row in datagram.data:
-                        print ("%.3f, %.3f" % (row[0], row[1]))
-                    createOutputFileName
                     outSVP = os.path.join(os.path.dirname(os.path.abspath(matches[0])), "SVP.csv")
                     outSVP = createOutputFileName(outSVP, args.odir)
                     print("Writing SVP Profile : %s" % outSVP)
