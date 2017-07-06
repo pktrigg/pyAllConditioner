@@ -26,6 +26,7 @@ def main():
     parser.add_argument('-odir', dest='odir', action='store', default="", help='-odir <folder> : specify a relative output folder e.g. -odir conditioned')
     parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='-extractbs : extract backscatter from Y datagram so we can analyse. [Default: False]')
     parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='-r : search Recursively.  [Default: False]')
+    parser.add_argument('-svp', action='store_true', default=False, dest='svp', help='-svp : output the SVP from the sound velocity datagram.  [Default: False]')
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(1)
@@ -129,7 +130,7 @@ def main():
                 if TypeOfDatagram == 'X':
                     datagram.read()
                     # now encode the datagram back, making changes along the way
-                    datagram.TransducerDepth = 0 
+                    datagram.TransducerDepth = 999
                     dg = datagram.encode()
                     outFilePtr.write(dg)
                     continue #we do not want to write the records twice!
