@@ -40,6 +40,7 @@ def main():
     correctBackscatter = False
     writeConditionedFile = True
     conditionBS = False
+    extractSVP = False
 
     if args.recursive:
         for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
@@ -92,6 +93,9 @@ def main():
         print ("Records to inject: %d" % len(SRH.SRHData))
         # auto exclude attitude records
         args.exclude = 'n'
+
+    if args.svp:
+        extractSVP=True
 
     for filename in matches:
 
@@ -149,7 +153,8 @@ def main():
                         ARC[arcIndex].sampleSum = ARC[arcIndex].sampleSum + sum(datagram.beams[i].samples)
                         ARC[arcIndex].sampleCount = ARC[arcIndex].sampleCount + len(datagram.beams[i].samples)
                         ARC[arcIndex].sector = transmitSector[i]
-
+                continue
+            
             if conditionBS:
                 if TypeOfDatagram == 'N':
                     datagram.read()
@@ -160,7 +165,22 @@ def main():
                     datagram.ARC = ARC
                     bytes = datagram.encode()
                     outFilePtr.write(bytes)
-                    
+
+            if extractSVP:
+                if TypeOfDatagram == 'U':
+                    datagram.read()
+                    print ("Depth, SpeedSound")
+                    for row in datagram.data:
+                        print ("%.3f, %.3f" % (row[0], row[1]))
+                    createOutputFileName
+                    outSVP = os.path.join(os.path.dirname(os.path.abspath(matches[0])), "SVP.csv")
+                    outSVP = createOutputFileName(outSVP, args.odir)
+                    print("Writing SVP Profile : %s" % outSVP)
+                    with open(outSVP, 'w') as f:
+                        f.write("Depth(m), SpeedSound(m/s), File: %s \n" % args.inputFile )
+                        for row in datagram.data:
+                            f.write("%.3f, %.3f \n" % (row[0], row[1]))
+                        f.close()
             # the user has opted to skip this datagram, so continue
             if TypeOfDatagram in args.exclude:
                 continue

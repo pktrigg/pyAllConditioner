@@ -23,6 +23,7 @@ implement -splitduration
 
 Done
 ====
+Implemented extraction of SVP so we can easily consume the profile in CARIS
 Implement -inject <filename> to inject .srh delayed heave into the .all file.
     read file for injection into memory with an essential time field
     loop through input file

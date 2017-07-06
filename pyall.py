@@ -20,11 +20,11 @@ from datetime import timedelta
 
 def main():
     #open the ALL file for reading by creating a new ALLReader class and passin in the filename to open.
-    filename =   "C:/Python27/ArcGIS10.3/pyall-master/0314_20170421_222154_SA1702-FE_302.all"
+    # filename =   "C:/Python27/ArcGIS10.3/pyall-master/0314_20170421_222154_SA1702-FE_302.all"
     # filename =   "C:/development/Python/m3Sample.all"
     # filename = "C:/development/python/0004_20110307_041009.all"
     # filename = "C:/development/python/sample.all"
-    # filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
+    filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
     r = ALLReader(filename)
     pingCount = 0
     start_time = time.time() # time the process
@@ -59,6 +59,7 @@ def main():
             nadirBeam = int(datagram.NBeams / 2)
             # print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f Checksum %s" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth, datagram.checksum)))
             continue
+        
 
         if TypeOfDatagram == 'I':
             datagram.read()
@@ -76,6 +77,10 @@ def main():
             continue
 
         if TypeOfDatagram == 'R':
+            datagram.read()
+            continue
+
+        if TypeOfDatagram == 'U':
             datagram.read()
             continue
 
@@ -221,6 +226,9 @@ class ALLReader:
         if TypeOfDatagram == 'P': # P Position
             dg = P_POSITION(self.fileptr, numberOfBytes)
             return dg.TypeOfDatagram, dg 
+        if TypeOfDatagram == 'U': # U Sound Velocity
+            dg = U_SVP(self.fileptr, numberOfBytes)
+            return dg.TypeOfDatagram, dg
         if TypeOfDatagram == 'X': # X Depth
             dg = X_DEPTH(self.fileptr, numberOfBytes)
             return dg.TypeOfDatagram, dg 
@@ -761,6 +769,52 @@ class D_DEPTH:
         self.RangeMultiplier    = s[0]
         self.ETX                = s[1]
         self.checksum           = s[2]
+
+###############################################################################
+class U_SVP:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'U'
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = []
+    
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHLLHH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+        self.ProfileDate     = s[8]
+        self.ProfileTime     = s[9]
+        self.NEntries        = s[10]
+        self.DepthResolution = s[11]
+
+        rec_fmt = '=LL'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+
+        i = 0
+        for i in range (self.NEntries):
+            data = self.fileptr.read(rec_len)
+            s = rec_unpack(data)
+            self.data.append([float (s[0]) / float(100/self.DepthResolution), float (s[1] / 10)])
+
+        # read an empty byte
+        self.fileptr.read(1)        
+
+        # now read the footer
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
 
 ###############################################################################
 class X_DEPTH:
