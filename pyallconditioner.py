@@ -223,9 +223,13 @@ def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injecti
         recordsToAdd.append(injectionData.popleft())
     
     if len(recordsToAdd) > 0:
-        counter = counter + 1
-        a = pyall.A_ATTITUDE_ENCODER()
-        datagram = a.encode(recordsToAdd, counter)
+        # counter = counter + 1
+        # a = pyall.A_ATTITUDE_ENCODER()
+        # datagram = a.encode(recordsToAdd, counter)
+        # outFilePtr.write(datagram)
+
+        h = pyall.H_HEIGHT_ENCODER()
+        datagram = h.encode(recordsToAdd[0][1])
         outFilePtr.write(datagram)
     return counter
 

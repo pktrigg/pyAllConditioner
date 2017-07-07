@@ -60,6 +60,8 @@ def main():
             # print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f Checksum %s" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth, datagram.checksum)))
             continue
         
+        if TypeOfDatagram == 'H':
+            datagram.read()
 
         if TypeOfDatagram == 'I':
             datagram.read()
@@ -211,6 +213,9 @@ class ALLReader:
         if TypeOfDatagram == 'D': # D DEPTH
             dg = D_DEPTH(self.fileptr, numberOfBytes)
             return dg.TypeOfDatagram, dg
+        if TypeOfDatagram == 'H': # H Height  
+            dg = H_HEIGHT(self.fileptr, numberOfBytes)
+            return dg.TypeOfDatagram, dg 
         if TypeOfDatagram == 'I': # I Installation 
             dg = I_INSTALLATION(self.fileptr, numberOfBytes)
             return dg.TypeOfDatagram, dg 
@@ -769,6 +774,59 @@ class D_DEPTH:
         self.RangeMultiplier    = s[0]
         self.ETX                = s[1]
         self.checksum           = s[2]
+
+###############################################################################
+class H_HEIGHT:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'h'
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = ""
+        self.Height = 0
+        self.HeightType = 0
+
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHlBBH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+        self.Height          = float (s[8] / float (100))
+        self.HeightType      = s[9]
+
+        # now read the footer
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
+###############################################################################
+class H_HEIGHT_ENCODER:
+    def encode(self, height):
+        '''Encode a Height datagram record'''
+
+        header_fmt = '=LBBHLLHHlBBH'
+        header_len = struct.calcsize(header_fmt)
+
+        fullDatagram = bytearray()
+
+        fullDatagramByteCount = header_len
+
+        # pack the header
+        self.Height = height
+        ETX = 3
+        checksum = 0
+        recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.HeightType), ETX, checksum)
+        fullDatagram = header
+        return fullDatagram
 
 ###############################################################################
 class U_SVP:
