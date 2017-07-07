@@ -111,7 +111,12 @@ def main():
         counter = 0
         
         r = pyall.ALLReader(filename)
-        nav = r.loadNavigation()
+
+        if extractSVP:
+            # we need the position of the SVP dip in the SVP file, so use the first position record in the file.
+            nav = r.loadNavigation(True)
+            latitude = nav[0][1]
+            longitude = nav[0][2]
 
         if inject:                    
             TypeOfDatagram, datagram = r.readDatagram()
@@ -171,7 +176,7 @@ def main():
                     outFilePtr.write(bytes)
 
             if extractSVP:
-                extractProfile(datagram, TypeOfDatagram, latitude, longitude, filename, args.odir)
+                extractProfile(datagram, TypeOfDatagram, r.currentRecordDateTime(), latitude, longitude, filename, args.odir)
         
 
             # the user has opted to skip this datagram, so continue
@@ -201,7 +206,7 @@ def main():
 
 
 ###############################################################################
-def extractProfile(datagram, TypeOfDatagram, latitude, longitude, filename, odir):
+def extractProfile(datagram, TypeOfDatagram, currentRecordDateTime, latitude, longitude, filename, odir):
     if (TypeOfDatagram == 'P'):
         datagram.read()
         # remember the current position, so we can use it for the SVP extraction
@@ -210,20 +215,19 @@ def extractProfile(datagram, TypeOfDatagram, latitude, longitude, filename, odir
 
     if TypeOfDatagram == 'U':
         datagram.read()
-        outSVP = os.path.join(os.path.dirname(os.path.abspath(filename)), "SVP.csv")
-        outSVP = createOutputFileName(outSVP, args.odir)
+        outSVP = os.path.join(os.path.dirname(os.path.abspath(filename)), "SVP2.svp")
+        outSVP = createOutputFileName(outSVP, odir)
         print("Writing SVP Profile : %s" % outSVP)
         with open(outSVP, 'w') as f:
             f.write("[SVP_Version_2]\n")
             f.write("%s\n" % filename)
             
-            
-            day_of_year = (r.currentRecordDateTime() - datetime(r.currentRecordDateTime().year, 1, 1)).days
+            day_of_year = (currentRecordDateTime - datetime(currentRecordDateTime.year, 1, 1)).days
             lat = decdeg2dms(latitude)
             lon = decdeg2dms(longitude)
-            f.write("Section %s-%s %s:%s:%s %s:%s:%s\n" % (r.currentRecordDateTime().year, day_of_year, r.currentRecordDateTime().hour, r.currentRecordDateTime().minute, r.currentRecordDateTime().second, lat[0], lat[1], lat[2] ))
+            f.write("Section %s-%s %s:%s:%s %s:%s:%.3f %s:%s:%.3f\n" % (currentRecordDateTime.year, day_of_year, currentRecordDateTime.hour, currentRecordDateTime.minute, currentRecordDateTime.second, int(lat[0]), int(lat[1]), lat[2], int(lon[0]), int(lon[1]), lon[2] ))
             for row in datagram.data:
-                f.write("%.3f, %.3f \n" % (row[0], row[1]))
+                f.write("%.3f %.3f \n" % (row[0], row[1]))
             f.close()
     return
 

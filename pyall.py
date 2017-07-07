@@ -247,16 +247,13 @@ class ALLReader:
             return dg.TypeOfDatagram, dg
             # self.fileptr.seek(numberOfBytes, 1)
 
-    def loadNavigation(self):    
+    def loadNavigation(self, firstRecordOnly=False):    
         '''loads all the navigation into lists'''
         navigation = []
         selectedPositioningSystem = None
         self.rewind()
         while self.moreData():
             TypeOfDatagram, datagram = self.readDatagram()
-            print (TypeOfDatagram)
-            if TypeOfDatagram ==0:
-                print ("dd")
             if (TypeOfDatagram == 'P'):
                 datagram.read()
                 recDate = self.currentRecordDateTime()
@@ -267,6 +264,10 @@ class ALLReader:
                     navigation.append([self.to_timestamp(recDate), datagram.Latitude, datagram.Longitude])
                     # for python 3.4
                     # navigation.append([recDate.timestamp(), datagram.Latitude, datagram.Longitude])
+                    
+                    if firstRecordOnly: #we only want the first record, so reset the file pointer and quit
+                        self.rewind()
+                        return navigation
         self.rewind()
         return navigation
 
