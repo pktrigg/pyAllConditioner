@@ -24,26 +24,28 @@ def main():
     # filename =   "C:/development/Python/m3Sample.all"
     # filename = "C:/development/python/0004_20110307_041009.all"
     # filename = "C:/development/python/sample.all"
-    filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
+    filename = "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"
+    # filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
     r = ALLReader(filename)
     pingCount = 0
     start_time = time.time() # time the process
 
-    # navigation = r.loadNavigation()
-    # print("Load Navigation Duration: %.2fs" % (time.time() - start_time)) # time the process
-    # print (navigation)
+    navigation = r.loadNavigation()
+    print("Load Navigation Duration: %.2fs" % (time.time() - start_time)) # time the process
+    print (navigation)
 
     while r.moreData():
         # read a datagram.  If we support it, return the datagram type and aclass for that datagram
         # The user then needs to call the read() method for the class to undertake a fileread and binary decode.  This keeps the read super quick.
         TypeOfDatagram, datagram = r.readDatagram()
-        # print("TypeOfDatagram:", TypeOfDatagram)
+        print("TypeOfDatagram:", TypeOfDatagram)
         # print(r.currentRecordDateTime())
 
         if TypeOfDatagram == '3':
             datagram.read()
-            #  print (datagram.data)
+            print (datagram.data)
             continue
+
         if TypeOfDatagram == 'A':
             datagram.read()
             # for a in datagram.Attitude:
@@ -252,6 +254,9 @@ class ALLReader:
         self.rewind()
         while self.moreData():
             TypeOfDatagram, datagram = self.readDatagram()
+            print (TypeOfDatagram)
+            if TypeOfDatagram ==0:
+                print ("dd")
             if (TypeOfDatagram == 'P'):
                 datagram.read()
                 recDate = self.currentRecordDateTime()
@@ -335,130 +340,6 @@ class ALLReader:
         if (TypeOfDatagram == 'B'):
             return "B_BIST_Result"
 
-###############################################################################
-class UNKNOWN_RECORD:
-    '''used as a convenience tool for datagrams we have no bespoke classes.  Better to make a bespoke class'''
-    def __init__(self, fileptr, numberOfBytes, typeOfDatagram):
-        self.TypeOfDatagram = typeOfDatagram
-        self.offset = fileptr.tell()
-        self.numberOfBytes = numberOfBytes
-        self.fileptr = fileptr
-        self.fileptr.seek(numberOfBytes, 1)
-        self.data = ""
-    def read(self):
-        self.data = self.fileptr.read(self.numberOfBytes)
-
-###############################################################################
-class Y_SEABEDIMAGE:
-    def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'Y'
-        self.offset = fileptr.tell()
-        self.numberOfBytes = numberOfBytes
-        self.fileptr = fileptr
-        self.fileptr.seek(numberOfBytes, 1)
-        self.data = ""
-        self.ARC = []
-        
-    def read(self):
-        self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHfHhhHHH'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack_from
-        s = rec_unpack(self.fileptr.read(rec_len))
-
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = float(s[5]/1000.0)
-        self.Counter         = s[6]
-        self.SerialNumber    = s[7]
-        self.SampleFrequency   = s[8]
-        self.RangeToNormalIncidence   = s[9]
-        self.NormalIncidence   = s[10]
-        self.ObliqueBS   = s[11]
-        self.TxBeamWidth   = s[12]
-        self.TVGCrossOver   = s[13]
-        self.NumBeams   = s[14]
-        self.beams = []
-        self.numSamples = 0
-        self.samples =[]
-
-        rec_fmt = '=bBHH'            
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-
-        self.numSamples = 0
-        for i in range(self.NumBeams):            
-            s = rec_unpack(self.fileptr.read(rec_len))
-            b = cBeam(s, 0)
-            self.numSamples = self.numSamples + b.numberOfSamplesPerBeam
-            self.beams.append(b)
-
-        rec_fmt = '=' + str(self.numSamples) + 'h'            
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        self.samples = rec_unpack(self.fileptr.read(rec_len))
-        
-        # allocate the samples to the correct beams so it is easier to use
-        sampleIDX = 0
-        for b in self.beams:
-            b.samples = self.samples[sampleIDX: sampleIDX + b.numberOfSamplesPerBeam] 
-            sampleIDX = sampleIDX + b.numberOfSamplesPerBeam
-
-        # read an empty byte
-        self.fileptr.read(1)        
-
-        # now read the footer
-        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
-
-###############################################################################
-    def encode(self):
-        '''Encode a seabed image datagram record'''
-
-        header_fmt = '=LBBHLLHHfHhhHHH'
-        header_len = struct.calcsize(header_fmt)
-
-        fullDatagram = bytearray()
-        
-        rec_fmt = '=bBHH'            
-        rec_len = struct.calcsize(rec_fmt)
-
-        sample_fmt = '=' + str(self.numSamples) + 'h'            
-        sample_len = struct.calcsize(sample_fmt)
-        
-        footer_fmt = '=BBH'
-        footer_len = struct.calcsize(footer_fmt)
-
-        fullDatagramByteCount = header_len + (rec_len*self.NumBeams) + sample_len + footer_len
-
-        # pack the header
-        recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, self.SampleFrequency, self.RangeToNormalIncidence, self.NormalIncidence, self.ObliqueBS, self.TxBeamWidth, self.TVGCrossOver, self.NumBeams)
-        fullDatagram = fullDatagram + header
-
-        # pack the beam summary info
-        for b in self.beams:
-            bodyRecord = struct.pack(rec_fmt, b.sortingDirection, b.detectionInfo, b.numberOfSamplesPerBeam, b.centreSampleNumber)
-            fullDatagram = fullDatagram + bodyRecord
-
-        # now add the ARC correction based on the take off angles 
-        s = list(self.samples)
-        for i in range(len(s)):
-            s[i] = 0            
-        # pack the actual seabed imagery
-        sampleRecord = struct.pack(sample_fmt, *s)
-        fullDatagram = fullDatagram + sampleRecord
-
-        # now pack the footer 
-        systemDescriptor = 1
-        ETX = 3
-        checksum = 0
-        footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
-        fullDatagram = fullDatagram + footer
-
-        return fullDatagram
 
 ###############################################################################
 class cBeam:
@@ -471,61 +352,6 @@ class cBeam:
         self.takeOffAngle           = angle
         self.sampleSum              = 0
         self.samples                = []
-
-###############################################################################
-class n_ATTITUDE:
-    def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'n'
-        self.offset = fileptr.tell()
-        self.numberOfBytes = numberOfBytes
-        self.fileptr = fileptr
-        self.fileptr.seek(numberOfBytes, 1)
-        self.data = ""
-    
-    def read(self):
-        self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHHbB'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack_from
-        s = rec_unpack(self.fileptr.read(rec_len))
-
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = float(s[5]/1000.0)
-        self.Counter         = s[6]
-        self.SerialNumber    = s[7]
-        self.NumberEntries   = s[8]
-        self.SystemDescriptor= s[9]
-
-        rec_fmt = '=HhhhHB'            
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-
-        # we need to store all the attitude data in a list 
-        self.Attitude = [0 for i in range(self.NumberEntries)]
-
-        i = 0
-        while i < self.NumberEntries:
-            data = self.fileptr.read(rec_len)
-            s = rec_unpack(data)
-
-            inputTelegramSize = s[5]
-            data = self.fileptr.read(inputTelegramSize)
-            self.Attitude[i] = [self.RecordDate, self.Time + s[0]/1000, s[1], s[2]/100.0, s[3]/100.0, s[4]/100.0, s[5]/100.0, data]
-            i = i + 1
-
-        # now spare byte only if necessary
-        if self.numberOfBytes % 2 != 0:
-            self.fileptr.read(1)        
-
-        # read an empty byte
-        self.fileptr.read(1)        
-
-        # now read the footer
-        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
 ###############################################################################
 class A_ATTITUDE_ENCODER:
@@ -641,22 +467,22 @@ class A_ATTITUDE:
         self.ETX                = s[1]
         self.checksum           = s[2]
 
-    
 ###############################################################################
-class E_EXTRA:
+class C_CLOCK:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = '3'
+        self.TypeOfDatagram = 'C'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
         self.fileptr.seek(numberOfBytes, 1)
-        self.ExtraData = ""
-    
+        self.data = ""
+
     def read(self):
         self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHH'
+        rec_fmt = '=LBBHLLHHLLBBH'
         rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        # bytesRead = rec_len
         s = rec_unpack(self.fileptr.read(rec_len))
 
         # self.numberOfBytes   = s[0]
@@ -665,28 +491,15 @@ class E_EXTRA:
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
-        self.Counter         = s[6]
+        self.ClockCounter    = s[6]
         self.SerialNumber    = s[7]
-        self.ContentIdentifier   = s[8]
 
-        # now read the variable position part of the Record 
-        if self.numberOfBytes % 2 == 0:
-            bytesToRead = self.numberOfBytes - rec_len  # 'sBBH'
-        else:
-            bytesToRead = self.numberOfBytes - rec_len  # 'sBH'
-        
-        # now read the block of data whatever it may contain
-        self.ExtraData = self.fileptr.read(bytesToRead)
-
-        # now spare byte only if necessary
-        if self.numberOfBytes % 2 != 0:
-            self.fileptr.read(1)        
-
-        # read an empty byte
-        self.fileptr.read(1)        
-
-        # now read the footer
-        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+        self.ExternalDate       = s[8]
+        self.ExternalTime       = s[9]
+        self.PPS                = s[10]
+        self.ETX                = s[11]
+        self.checksum           = s[12]
+    
 
 ###############################################################################
 class D_DEPTH:
@@ -776,6 +589,52 @@ class D_DEPTH:
         self.checksum           = s[2]
 
 ###############################################################################
+class E_EXTRA:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = '3'
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.ExtraData = ""
+    
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        # self.numberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+        self.ContentIdentifier   = s[8]
+
+        # now read the variable position part of the Record 
+        if self.numberOfBytes % 2 != 0:
+            bytesToRead = self.numberOfBytes - rec_len  - 5 # 'sBBH'
+        else:
+            bytesToRead = self.numberOfBytes - rec_len  - 4 # 'sBH'
+        
+        # now read the block of data whatever it may contain
+        self.data = self.fileptr.read(bytesToRead)
+
+        # # now spare byte only if necessary
+        # if self.numberOfBytes % 2 != 0:
+        #     self.fileptr.read(1)        
+
+        # read an empty byte
+        self.fileptr.read(1)        
+
+        # now read the footer
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
+###############################################################################
 class H_HEIGHT:
     def __init__(self, fileptr, numberOfBytes):
         self.TypeOfDatagram = 'h'
@@ -827,6 +686,340 @@ class H_HEIGHT_ENCODER:
         header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.HeightType), ETX, checksum)
         fullDatagram = header
         return fullDatagram
+
+###############################################################################
+class I_INSTALLATION:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'I'       # assign the KM code for this datagram type
+        self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
+        self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains. This includes the first 4 bytes represnting the number of bytes inthe datagram
+        self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
+        self.fileptr.seek(numberOfBytes, 1)     # move the file pointer to the end of the record so we can skip as the default actions
+        self.data = ""
+
+    def read(self):        
+        self.fileptr.seek(self.offset, 0)   # move the file pointer to the start of the record so we can read from disc              
+        rec_fmt = '=LBBHLL3H'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+           # read the record from disc
+        bytesRead = rec_len
+        s = rec_unpack(self.fileptr.read(rec_len))
+        
+        # self.numberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.SurveyLineNumber= s[6]
+        self.SerialNumber    = s[7]
+        self.SecondarySerialNumber = s[8]
+
+        totalAsciiBytes = self.numberOfBytes - rec_len; # we do not need to read the header twice
+        data = self.fileptr.read(totalAsciiBytes)   # read the record from disc
+        bytesRead = bytesRead + totalAsciiBytes 
+        parameters = data.decode('utf-8', errors="ignore").split(",")
+        self.installationParameters = {}
+        for p in parameters:
+            parts = p.split("=")
+            if len(parts) > 1:
+                self.installationParameters[parts[0]] = parts[1].strip()
+
+        #read any trailing bytes.  We have seen the need for this with some .all files.
+        if bytesRead < self.numberOfBytes:
+            self.fileptr.read(int(self.numberOfBytes - bytesRead))
+
+###############################################################################
+class n_ATTITUDE:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'n'
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = ""
+    
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHHbB'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        # self.numberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+        self.NumberEntries   = s[8]
+        self.SystemDescriptor= s[9]
+
+        rec_fmt = '=HhhhHB'            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+
+        # we need to store all the attitude data in a list 
+        self.Attitude = [0 for i in range(self.NumberEntries)]
+
+        i = 0
+        while i < self.NumberEntries:
+            data = self.fileptr.read(rec_len)
+            s = rec_unpack(data)
+
+            inputTelegramSize = s[5]
+            data = self.fileptr.read(inputTelegramSize)
+            self.Attitude[i] = [self.RecordDate, self.Time + s[0]/1000, s[1], s[2]/100.0, s[3]/100.0, s[4]/100.0, s[5]/100.0, data]
+            i = i + 1
+
+        # # now spare byte only if necessary
+        # if self.numberOfBytes % 2 != 0:
+        #     self.fileptr.read(1)        
+
+        # read an empty byte
+        self.fileptr.read(1)        
+
+        # now read the footer
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
+###############################################################################
+class N_TRAVELTIME:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'N'
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = ""
+
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHHHHHfL'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        bytesRead = rec_len
+        s = rec_unpack(self.fileptr.read(rec_len))
+
+        # self.numberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.PingCounter     = s[6]
+        self.SerialNumber    = s[7]
+        self.SoundSpeedAtTransducer = s[8]
+        self.NumTransitSector= s[9]
+        self.NumReceiveBeams = s[10]
+        self.NumValidDetect  = s[11]
+        self.SampleFrequency = float (s[12])
+        self.DScale          = s[13]
+
+        self.TiltAngle                    = [0 for i in range(self.NumTransitSector)]
+        self.FocusRange                   = [0 for i in range(self.NumTransitSector)]
+        self.SignalLength                 = [0 for i in range(self.NumTransitSector)]
+        self.SectorTransmitDelay          = [0 for i in range(self.NumTransitSector)]
+        self.CentreFrequency              = [0 for i in range(self.NumTransitSector)]
+        self.MeanAbsorption               = [0 for i in range(self.NumTransitSector)]
+        self.SignalWaveformID             = [0 for i in range(self.NumTransitSector)]
+        self.TransmitSectorNumberTX       = [0 for i in range(self.NumTransitSector)]
+        self.SignalBandwidth              = [0 for i in range(self.NumTransitSector)]
+
+        self.BeamPointingAngle            = [0 for i in range(self.NumReceiveBeams)]
+        self.TransmitSectorNumber         = [0 for i in range(self.NumReceiveBeams)]
+        self.DetectionInfo                = [0 for i in range(self.NumReceiveBeams)]
+        self.DetectionWindow              = [0 for i in range(self.NumReceiveBeams)]
+        self.QualityFactor                = [0 for i in range(self.NumReceiveBeams)]
+        self.DCorr                        = [0 for i in range(self.NumReceiveBeams)]
+        self.TwoWayTravelTime             = [0 for i in range(self.NumReceiveBeams)]
+        self.Reflectivity                 = [0 for i in range(self.NumReceiveBeams)]
+        self.RealtimeCleaningInformation  = [0 for i in range(self.NumReceiveBeams)]
+        self.Spare                        = [0 for i in range(self.NumReceiveBeams)]
+
+        # # now read the variable part of the Transmit Record
+        rec_fmt = '=hHfffHBBf'            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        for i in range(self.NumTransitSector):
+            data = self.fileptr.read(rec_len)
+            bytesRead += rec_len
+            s = rec_unpack(data)
+            self.TiltAngle[i] = float (s[0]) / float (100)
+            self.FocusRange[i] =  s[1]
+            self.SignalLength[i] = float (s[2])
+            self.SectorTransmitDelay[i] = float(s[3])
+            self.CentreFrequency[i] =  float (s[4])
+            self.MeanAbsorption[i] =  s[5]
+            self.SignalWaveformID[i] = s[6]
+            self.TransmitSectorNumberTX[i] =  s[7]
+            self.SignalBandwidth[i] = float (s[8])
+        
+        # now read the variable part of the recieve record
+        rx_rec_fmt = '=hBBHBbfhbB'
+        rx_rec_len = struct.calcsize(rx_rec_fmt)
+        rx_rec_unpack = struct.Struct(rx_rec_fmt).unpack
+        for i in range(self.NumReceiveBeams):
+            data = self.fileptr.read(rx_rec_len)
+            bytesRead += rx_rec_len
+            rx_s = rx_rec_unpack(data)
+            self.BeamPointingAngle[i] = float (rx_s[0]) / float (100)
+            self.TransmitSectorNumber[i] = rx_s[1]
+            self.DetectionInfo[i] = rx_s[2]
+            self.DetectionWindow[i] = rx_s[3]
+            self.QualityFactor[i] = rx_s[4]
+            self.DCorr[i] = rx_s[5]
+            self.TwoWayTravelTime[i] = float (rx_s[6])
+            self.Reflectivity[i] = rx_s[7]
+            self.RealtimeCleaningInformation[i] = rx_s[8]
+            self.Spare[i]                       = rx_s[9]
+        
+        rec_fmt = '=BBH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        data = self.fileptr.read(rec_len)
+        s = rec_unpack(data)
+            
+        self.ETX                = s[1]
+        self.checksum           = s[2]
+###############################################################################
+class P_POSITION:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'P'       # assign the KM code for this datagram type
+        self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
+        self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains
+        self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
+        self.fileptr.seek(numberOfBytes, 1)     # move the file pointer to the end of the record so we can skip as the default actions
+        self.data = ""
+
+    def read(self):        
+        self.fileptr.seek(self.offset, 0)   # move the file pointer to the start of the record so we can read from disc              
+        rec_fmt = '=LBBHLLHHll4HBB'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        # bytesRead = rec_len
+        s = rec_unpack(self.fileptr.read(rec_len))
+        
+        self.numberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = float(s[5]/1000.0)
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+        self.Latitude        = float (s[8] / float(20000000))
+        self.Longitude       = float (s[9] / float(10000000))
+        self.Quality         = float (s[10] / float(100))
+        self.SpeedOverGround = float (s[11] / float(100))
+        self.CourseOverGround= float (s[12] / float(100))
+        self.Heading         = float (s[13] / float(100))
+        self.Descriptor      = s[14]
+        self.NBytesDatagram  = s[15]
+
+        # now read the block of data whatever it may contain
+        self.data = self.fileptr.read(self.NBytesDatagram)
+
+        # now spare byte only if necessary
+        if (rec_len + self.NBytesDatagram + 3) % 2 != 0:
+            self.fileptr.read(1)        
+
+        self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
+
+def readFooter(numberOfBytes, fileptr):
+        rec_fmt = '=BH'
+            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(fileptr.read(rec_len))
+        ETX                = s[0]
+        checksum           = s[1]
+        # self.DatagramAsReceived = s[0].decode('utf-8').rstrip('\x00')
+        # if numberOfBytes % 2 == 0:
+        #     # skip the spare byte
+        #     ETX                = s[2]
+        #     checksum           = s[3]
+        # else:        
+        #     ETX                = s[1]
+        #     checksum           = s[2]
+        
+        # #read any trailing bytes.  We have seen the need for this with some .all files.
+        # if bytesRead < self.numberOfBytes:
+        #     self.fileptr.read(int(self.numberOfBytes - bytesRead))
+
+        return ETX, checksum
+
+###############################################################################
+class R_RUNTIME:
+    def __init__(self, fileptr, numberOfBytes):
+        self.TypeOfDatagram = 'R'       # assign the KM code for this datagram type
+        self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
+        self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains
+        self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
+        self.fileptr.seek(numberOfBytes, 1)     # move the file pointer to the end of the record so we can skip as the default actions
+        self.data = ""
+
+    def read(self):        
+        self.fileptr.seek(self.offset, 0)   # move the file pointer to the start of the record so we can read from disc              
+        rec_fmt = '=LBBHLLHHBBBBBBHHHHHbBBBBBHBBBBHHBBH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        data = self.fileptr.read(rec_len)
+        s = rec_unpack(data)
+
+        # self.numberOfBytes   = s[0]
+        self.STX             = s[1]
+        self.TypeOfDatagram  = chr(s[2])
+        self.EMModel         = s[3]
+        self.RecordDate      = s[4]
+        self.Time            = s[5]/1000
+        self.Counter         = s[6]
+        self.SerialNumber    = s[7]
+
+        self.operatorStationStatus = s[8]
+        # if operatorStationStatus >>
+        self.processingUnitStatus   = s[9]
+        self.BSPStatus              = s[10]
+        self.sonarHeadStatus        = s[11]
+        self.mode                   = s[12]
+        self.filterIdentifier       = s[13]
+        self.minimumDepth           = s[14]
+        self.maximumDepth           = s[15]
+        self.absorptionCoefficient  = s[16]
+        self.transmitPulseLength    = s[17]
+        self.transmitBeamWidth      = s[18]
+        self.transmitPower          = s[19]
+        self.receiveBeamWidth       = s[20]
+        self.receiveBandwidth       = s[21]
+        self.mode2                  = s[22]
+        self.tvg                    = s[23]
+        self.sourceOfSpeedSound     = s[24]
+        self.maximumPortWidth       = s[25]
+        self.beamSpacing            = s[26]
+        self.maximumPortCoverageDegrees     = s[27]
+        self.yawAndPitchStabilisationMode   = s[28]
+        self.maximumStbdCoverageDegrees     = s[29]
+        self.maximumStbdWidth               = s[30]
+        self.transmitAAlongTilt             = s[31]
+        self.filterIdentifier               = s[32]
+        self.ETX                            = s[33]
+        self.checksum                       = s[34]
+            
+
+###############################################################################
+class UNKNOWN_RECORD:
+    '''used as a convenience tool for datagrams we have no bespoke classes.  Better to make a bespoke class'''
+    def __init__(self, fileptr, numberOfBytes, typeOfDatagram):
+        self.TypeOfDatagram = typeOfDatagram
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
+        self.data = ""
+    def read(self):
+        self.data = self.fileptr.read(self.numberOfBytes)
 
 ###############################################################################
 class U_SVP:
@@ -991,82 +1184,24 @@ class X_DEPTH:
 
         return fullDatagram
 
-
 ###############################################################################
-class R_RUNTIME:
+class Y_SEABEDIMAGE:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'R'       # assign the KM code for this datagram type
-        self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
-        self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains
-        self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
-        self.fileptr.seek(numberOfBytes, 1)     # move the file pointer to the end of the record so we can skip as the default actions
+        self.TypeOfDatagram = 'Y'
+        self.offset = fileptr.tell()
+        self.numberOfBytes = numberOfBytes
+        self.fileptr = fileptr
+        self.fileptr.seek(numberOfBytes, 1)
         self.data = ""
-
-    def read(self):        
-        self.fileptr.seek(self.offset, 0)   # move the file pointer to the start of the record so we can read from disc              
-        rec_fmt = '=LBBHLLHHBBBBBBHHHHHbBBBBBHBBBBHHBBH'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        data = self.fileptr.read(rec_len)
-        s = rec_unpack(data)
-
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = s[5]/1000
-        self.Counter         = s[6]
-        self.SerialNumber    = s[7]
-
-        self.operatorStationStatus = s[8]
-        # if operatorStationStatus >>
-        self.processingUnitStatus   = s[9]
-        self.BSPStatus              = s[10]
-        self.sonarHeadStatus        = s[11]
-        self.mode                   = s[12]
-        self.filterIdentifier       = s[13]
-        self.minimumDepth           = s[14]
-        self.maximumDepth           = s[15]
-        self.absorptionCoefficient  = s[16]
-        self.transmitPulseLength    = s[17]
-        self.transmitBeamWidth      = s[18]
-        self.transmitPower          = s[19]
-        self.receiveBeamWidth       = s[20]
-        self.receiveBandwidth       = s[21]
-        self.mode2                  = s[22]
-        self.tvg                    = s[23]
-        self.sourceOfSpeedSound     = s[24]
-        self.maximumPortWidth       = s[25]
-        self.beamSpacing            = s[26]
-        self.maximumPortCoverageDegrees     = s[27]
-        self.yawAndPitchStabilisationMode   = s[28]
-        self.maximumStbdCoverageDegrees     = s[29]
-        self.maximumStbdWidth               = s[30]
-        self.transmitAAlongTilt             = s[31]
-        self.filterIdentifier               = s[32]
-        self.ETX                            = s[33]
-        self.checksum                       = s[34]
-            
-
-###############################################################################
-class P_POSITION:
-    def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'P'       # assign the KM code for this datagram type
-        self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
-        self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains
-        self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
-        self.fileptr.seek(numberOfBytes, 1)     # move the file pointer to the end of the record so we can skip as the default actions
-        self.ExtraData = ""
-
-    def read(self):        
-        self.fileptr.seek(self.offset, 0)   # move the file pointer to the start of the record so we can read from disc              
-        rec_fmt = '=LBBHLLHHll4HBB'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        # bytesRead = rec_len
-        s = rec_unpack(self.fileptr.read(rec_len))
+        self.ARC = []
         
+    def read(self):
+        self.fileptr.seek(self.offset, 0)
+        rec_fmt = '=LBBHLLHHfHhhHHH'
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack_from
+        s = rec_unpack(self.fileptr.read(rec_len))
+
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
         self.TypeOfDatagram  = chr(s[2])
@@ -1075,222 +1210,95 @@ class P_POSITION:
         self.Time            = float(s[5]/1000.0)
         self.Counter         = s[6]
         self.SerialNumber    = s[7]
-        self.Latitude        = float (s[8] / float(20000000))
-        self.Longitude       = float (s[9] / float(10000000))
-        self.Quality         = float (s[10] / float(100))
-        self.SpeedOverGround = float (s[11] / float(100))
-        self.CourseOverGround= float (s[12] / float(100))
-        self.Heading         = float (s[13] / float(100))
-        self.Descriptor      = s[14]
-        self.NBytesDatagram  = s[15]
+        self.SampleFrequency   = s[8]
+        self.RangeToNormalIncidence   = s[9]
+        self.NormalIncidence   = s[10]
+        self.ObliqueBS   = s[11]
+        self.TxBeamWidth   = s[12]
+        self.TVGCrossOver   = s[13]
+        self.NumBeams   = s[14]
+        self.beams = []
+        self.numSamples = 0
+        self.samples =[]
 
-        # now read the block of data whatever it may contain
-        self.ExtraData = self.fileptr.read(self.NBytesDatagram)
+        rec_fmt = '=bBHH'            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
 
-        # now spare byte only if necessary
-        if self.numberOfBytes % 2 != 0:
-            self.fileptr.read(1)        
+        self.numSamples = 0
+        for i in range(self.NumBeams):            
+            s = rec_unpack(self.fileptr.read(rec_len))
+            b = cBeam(s, 0)
+            self.numSamples = self.numSamples + b.numberOfSamplesPerBeam
+            self.beams.append(b)
 
+        rec_fmt = '=' + str(self.numSamples) + 'h'            
+        rec_len = struct.calcsize(rec_fmt)
+        rec_unpack = struct.Struct(rec_fmt).unpack
+        self.samples = rec_unpack(self.fileptr.read(rec_len))
+        
+        # allocate the samples to the correct beams so it is easier to use
+        sampleIDX = 0
+        for b in self.beams:
+            b.samples = self.samples[sampleIDX: sampleIDX + b.numberOfSamplesPerBeam] 
+            sampleIDX = sampleIDX + b.numberOfSamplesPerBeam
+
+        # read an empty byte
+        self.fileptr.read(1)        
+
+        # now read the footer
         self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
-def readFooter(numberOfBytes, fileptr):
-        rec_fmt = '=BH'
-            
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack_from
-        s = rec_unpack(fileptr.read(rec_len))
-        ETX                = s[0]
-        checksum           = s[1]
-        # self.DatagramAsReceived = s[0].decode('utf-8').rstrip('\x00')
-        # if numberOfBytes % 2 == 0:
-        #     # skip the spare byte
-        #     ETX                = s[2]
-        #     checksum           = s[3]
-        # else:        
-        #     ETX                = s[1]
-        #     checksum           = s[2]
-        
-        # #read any trailing bytes.  We have seen the need for this with some .all files.
-        # if bytesRead < self.numberOfBytes:
-        #     self.fileptr.read(int(self.numberOfBytes - bytesRead))
-
-        return ETX, checksum
-
 ###############################################################################
-class N_TRAVELTIME:
-    def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'N'
-        self.offset = fileptr.tell()
-        self.numberOfBytes = numberOfBytes
-        self.fileptr = fileptr
-        self.fileptr.seek(numberOfBytes, 1)
-        self.data = ""
+    def encode(self):
+        '''Encode a seabed image datagram record'''
 
-    def read(self):
-        self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHHHHHfL'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        bytesRead = rec_len
-        s = rec_unpack(self.fileptr.read(rec_len))
+        header_fmt = '=LBBHLLHHfHhhHHH'
+        header_len = struct.calcsize(header_fmt)
 
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = float(s[5]/1000.0)
-        self.PingCounter     = s[6]
-        self.SerialNumber    = s[7]
-        self.SoundSpeedAtTransducer = s[8]
-        self.NumTransitSector= s[9]
-        self.NumReceiveBeams = s[10]
-        self.NumValidDetect  = s[11]
-        self.SampleFrequency = float (s[12])
-        self.DScale          = s[13]
-
-        self.TiltAngle                    = [0 for i in range(self.NumTransitSector)]
-        self.FocusRange                   = [0 for i in range(self.NumTransitSector)]
-        self.SignalLength                 = [0 for i in range(self.NumTransitSector)]
-        self.SectorTransmitDelay          = [0 for i in range(self.NumTransitSector)]
-        self.CentreFrequency              = [0 for i in range(self.NumTransitSector)]
-        self.MeanAbsorption               = [0 for i in range(self.NumTransitSector)]
-        self.SignalWaveformID             = [0 for i in range(self.NumTransitSector)]
-        self.TransmitSectorNumberTX       = [0 for i in range(self.NumTransitSector)]
-        self.SignalBandwidth              = [0 for i in range(self.NumTransitSector)]
-
-        self.BeamPointingAngle            = [0 for i in range(self.NumReceiveBeams)]
-        self.TransmitSectorNumber         = [0 for i in range(self.NumReceiveBeams)]
-        self.DetectionInfo                = [0 for i in range(self.NumReceiveBeams)]
-        self.DetectionWindow              = [0 for i in range(self.NumReceiveBeams)]
-        self.QualityFactor                = [0 for i in range(self.NumReceiveBeams)]
-        self.DCorr                        = [0 for i in range(self.NumReceiveBeams)]
-        self.TwoWayTravelTime             = [0 for i in range(self.NumReceiveBeams)]
-        self.Reflectivity                 = [0 for i in range(self.NumReceiveBeams)]
-        self.RealtimeCleaningInformation  = [0 for i in range(self.NumReceiveBeams)]
-        self.Spare                        = [0 for i in range(self.NumReceiveBeams)]
-
-        # # now read the variable part of the Transmit Record
-        rec_fmt = '=hHfffHBBf'            
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        for i in range(self.NumTransitSector):
-            data = self.fileptr.read(rec_len)
-            bytesRead += rec_len
-            s = rec_unpack(data)
-            self.TiltAngle[i] = float (s[0]) / float (100)
-            self.FocusRange[i] =  s[1]
-            self.SignalLength[i] = float (s[2])
-            self.SectorTransmitDelay[i] = float(s[3])
-            self.CentreFrequency[i] =  float (s[4])
-            self.MeanAbsorption[i] =  s[5]
-            self.SignalWaveformID[i] = s[6]
-            self.TransmitSectorNumberTX[i] =  s[7]
-            self.SignalBandwidth[i] = float (s[8])
+        fullDatagram = bytearray()
         
-        # now read the variable part of the recieve record
-        rx_rec_fmt = '=hBBHBbfhbB'
-        rx_rec_len = struct.calcsize(rx_rec_fmt)
-        rx_rec_unpack = struct.Struct(rx_rec_fmt).unpack
-        for i in range(self.NumReceiveBeams):
-            data = self.fileptr.read(rx_rec_len)
-            bytesRead += rx_rec_len
-            rx_s = rx_rec_unpack(data)
-            self.BeamPointingAngle[i] = float (rx_s[0]) / float (100)
-            self.TransmitSectorNumber[i] = rx_s[1]
-            self.DetectionInfo[i] = rx_s[2]
-            self.DetectionWindow[i] = rx_s[3]
-            self.QualityFactor[i] = rx_s[4]
-            self.DCorr[i] = rx_s[5]
-            self.TwoWayTravelTime[i] = float (rx_s[6])
-            self.Reflectivity[i] = rx_s[7]
-            self.RealtimeCleaningInformation[i] = rx_s[8]
-            self.Spare[i]                       = rx_s[9]
+        rec_fmt = '=bBHH'            
+        rec_len = struct.calcsize(rec_fmt)
+
+        sample_fmt = '=' + str(self.numSamples) + 'h'            
+        sample_len = struct.calcsize(sample_fmt)
         
-        rec_fmt = '=BBH'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack_from
-        data = self.fileptr.read(rec_len)
-        s = rec_unpack(data)
-            
-        self.ETX                = s[1]
-        self.checksum           = s[2]
+        footer_fmt = '=BBH'
+        footer_len = struct.calcsize(footer_fmt)
 
-###############################################################################
-class I_INSTALLATION:
-    def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'I'       # assign the KM code for this datagram type
-        self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
-        self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains. This includes the first 4 bytes represnting the number of bytes inthe datagram
-        self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
-        self.fileptr.seek(numberOfBytes, 1)     # move the file pointer to the end of the record so we can skip as the default actions
-        self.data = ""
+        fullDatagramByteCount = header_len + (rec_len*self.NumBeams) + sample_len + footer_len
 
-    def read(self):        
-        self.fileptr.seek(self.offset, 0)   # move the file pointer to the start of the record so we can read from disc              
-        rec_fmt = '=LBBHLL3H'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-           # read the record from disc
-        bytesRead = rec_len
-        s = rec_unpack(self.fileptr.read(rec_len))
-        
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = float(s[5]/1000.0)
-        self.SurveyLineNumber= s[6]
-        self.SerialNumber    = s[7]
-        self.SecondarySerialNumber = s[8]
+        # pack the header
+        recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, self.SampleFrequency, self.RangeToNormalIncidence, self.NormalIncidence, self.ObliqueBS, self.TxBeamWidth, self.TVGCrossOver, self.NumBeams)
+        fullDatagram = fullDatagram + header
 
-        totalAsciiBytes = self.numberOfBytes - rec_len; # we do not need to read the header twice
-        data = self.fileptr.read(totalAsciiBytes)   # read the record from disc
-        bytesRead = bytesRead + totalAsciiBytes 
-        parameters = data.decode('utf-8', errors="ignore").split(",")
-        self.installationParameters = {}
-        for p in parameters:
-            parts = p.split("=")
-            if len(parts) > 1:
-                self.installationParameters[parts[0]] = parts[1].strip()
+        # pack the beam summary info
+        for b in self.beams:
+            bodyRecord = struct.pack(rec_fmt, b.sortingDirection, b.detectionInfo, b.numberOfSamplesPerBeam, b.centreSampleNumber)
+            fullDatagram = fullDatagram + bodyRecord
 
-        #read any trailing bytes.  We have seen the need for this with some .all files.
-        if bytesRead < self.numberOfBytes:
-            self.fileptr.read(int(self.numberOfBytes - bytesRead))
+        # now add the ARC correction based on the take off angles 
+        s = list(self.samples)
+        for i in range(len(s)):
+            s[i] = 0            
+        # pack the actual seabed imagery
+        sampleRecord = struct.pack(sample_fmt, *s)
+        fullDatagram = fullDatagram + sampleRecord
 
-###############################################################################
-class C_CLOCK:
-    def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'C'
-        self.offset = fileptr.tell()
-        self.numberOfBytes = numberOfBytes
-        self.fileptr = fileptr
-        self.fileptr.seek(numberOfBytes, 1)
-        self.data = ""
+        # now pack the footer 
+        systemDescriptor = 1
+        ETX = 3
+        checksum = 0
+        footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+        fullDatagram = fullDatagram + footer
 
-    def read(self):
-        self.fileptr.seek(self.offset, 0)
-        rec_fmt = '=LBBHLLHHLLBBH'
-        rec_len = struct.calcsize(rec_fmt)
-        rec_unpack = struct.Struct(rec_fmt).unpack
-        # bytesRead = rec_len
-        s = rec_unpack(self.fileptr.read(rec_len))
+        return fullDatagram
 
-        # self.numberOfBytes   = s[0]
-        self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
-        self.EMModel         = s[3]
-        self.RecordDate      = s[4]
-        self.Time            = float(s[5]/1000.0)
-        self.ClockCounter    = s[6]
-        self.SerialNumber    = s[7]
 
-        self.ExternalDate       = s[8]
-        self.ExternalTime       = s[9]
-        self.PPS                = s[10]
-        self.ETX                = s[11]
-        self.checksum           = s[12]
+
+
 
 def dateToSecondsSinceMidnight(dateObject):
     return (dateObject - dateObject.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()

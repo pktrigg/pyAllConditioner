@@ -41,7 +41,10 @@ def main():
     writeConditionedFile = True
     conditionBS = False
     extractSVP = False
+    latitude = 0
+    longitude = 0
 
+    
     if args.recursive:
         for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
             for f in fnmatch.filter(filenames, '*.all'):
@@ -108,6 +111,7 @@ def main():
         counter = 0
         
         r = pyall.ALLReader(filename)
+        nav = r.loadNavigation()
 
         if inject:                    
             TypeOfDatagram, datagram = r.readDatagram()
@@ -167,16 +171,9 @@ def main():
                     outFilePtr.write(bytes)
 
             if extractSVP:
-                if TypeOfDatagram == 'U':
-                    datagram.read()
-                    outSVP = os.path.join(os.path.dirname(os.path.abspath(matches[0])), "SVP.csv")
-                    outSVP = createOutputFileName(outSVP, args.odir)
-                    print("Writing SVP Profile : %s" % outSVP)
-                    with open(outSVP, 'w') as f:
-                        f.write("Depth(m), SpeedSound(m/s), File: %s \n" % args.inputFile )
-                        for row in datagram.data:
-                            f.write("%.3f, %.3f \n" % (row[0], row[1]))
-                        f.close()
+                extractProfile(datagram, TypeOfDatagram, latitude, longitude, filename, args.odir)
+        
+
             # the user has opted to skip this datagram, so continue
             if TypeOfDatagram in args.exclude:
                 continue
@@ -203,6 +200,34 @@ def main():
         outFilePtr.close()
 
 
+###############################################################################
+def extractProfile(datagram, TypeOfDatagram, latitude, longitude, filename, odir):
+    if (TypeOfDatagram == 'P'):
+        datagram.read()
+        # remember the current position, so we can use it for the SVP extraction
+        latitude = datagram.Latitude
+        longitude = datagram.Longitude
+
+    if TypeOfDatagram == 'U':
+        datagram.read()
+        outSVP = os.path.join(os.path.dirname(os.path.abspath(filename)), "SVP.csv")
+        outSVP = createOutputFileName(outSVP, args.odir)
+        print("Writing SVP Profile : %s" % outSVP)
+        with open(outSVP, 'w') as f:
+            f.write("[SVP_Version_2]\n")
+            f.write("%s\n" % filename)
+            
+            
+            day_of_year = (r.currentRecordDateTime() - datetime(r.currentRecordDateTime().year, 1, 1)).days
+            lat = decdeg2dms(latitude)
+            lon = decdeg2dms(longitude)
+            f.write("Section %s-%s %s:%s:%s %s:%s:%s\n" % (r.currentRecordDateTime().year, day_of_year, r.currentRecordDateTime().hour, r.currentRecordDateTime().minute, r.currentRecordDateTime().second, lat[0], lat[1], lat[2] ))
+            for row in datagram.data:
+                f.write("%.3f, %.3f \n" % (row[0], row[1]))
+            f.close()
+    return
+
+###############################################################################
 def trimInjectionData(recordTimestamp, SRHData):
     print ("Trimming unwanted records up to 1 second before start of .all first record timestamp..." )
     i=0
@@ -263,6 +288,14 @@ def loadBSCorrFile(FileName):
 def from_timestamp(unixtime):
     return datetime(1970, 1 ,1) + timedelta(seconds=unixtime)
 
+###############################################################################
+def decdeg2dms(dd):
+   is_positive = dd >= 0
+   dd = abs(dd)
+   minutes,seconds = divmod(dd*3600,60)
+   degrees,minutes = divmod(minutes,60)
+   degrees = degrees if is_positive else -degrees
+   return (degrees,minutes,seconds)
 ###############################################################################
 def update_progress(job_title, progress):
     length = 20 # modify this to change the length

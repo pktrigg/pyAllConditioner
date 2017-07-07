@@ -13,10 +13,11 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
+            "args": ["-svp", "-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"]
         }
    ]
 }
+            "args": ["-svp", "-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "c:/projects/RVInvestigator/SRH_20161001_1475320090.srh"]
             "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]
         "args": ["-i", "C:/development/python/sample.all", "-conditionbs", "ARC.csv"]
