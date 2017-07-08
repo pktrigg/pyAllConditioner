@@ -83,8 +83,8 @@ def main():
         beamPointingAngles = []
         transmitSector = []
         writeConditionedFile = False # we dont need to write a conditioned .all file
-        outFileName = os.path.join(os.path.dirname(os.path.abspath(matches[0])), "AngularResponseCurve.csv")
-        outFileName = createOutputFileName(outFileName, args.odir)
+        outFileName = os.path.join(os.path.dirname(os.path.abspath(matches[0])), args.odir, "AngularResponseCurve.csv")
+        outFileName = createOutputFileName(outFileName)
 
     # the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
     if len(args.SRHInjectFileName) > 0:
@@ -104,7 +104,8 @@ def main():
 
         if writeConditionedFile:
             # create an output file based on the input
-            outFileName  = createOutputFileName(filename, args.odir)
+            outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+            outFileName  = createOutputFileName(filename)
             outFilePtr = open(outFileName, 'wb')
             print ("writing to file: %s" % outFileName)
 
@@ -215,12 +216,12 @@ def extractProfile(datagram, TypeOfDatagram, currentRecordDateTime, latitude, lo
 
     if TypeOfDatagram == 'U':
         datagram.read()
-        outSVP = os.path.join(os.path.dirname(os.path.abspath(filename)), "SVP2.svp")
-        outSVP = createOutputFileName(outSVP, odir)
+        outSVP = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_SVP.svp")
+        outSVP = createOutputFileName(outSVP)
         print("Writing SVP Profile : %s" % outSVP)
         with open(outSVP, 'w') as f:
             f.write("[SVP_Version_2]\n")
-            f.write("%s\n" % filename)
+            f.write("%s\n" % outSVP)
             
             day_of_year = (currentRecordDateTime - datetime(currentRecordDateTime.year, 1, 1)).days
             lat = decdeg2dms(latitude)
@@ -310,7 +311,7 @@ def update_progress(job_title, progress):
     sys.stdout.flush()
 
 ###############################################################################
-def createOutputFileName(path, odir):
+def createOutputFileName(path):
      '''Create a valid output filename. if the name of the file already exists the file name is auto-incremented.'''
      path      = os.path.expanduser(path)
 
@@ -326,10 +327,10 @@ def createOutputFileName(path, odir):
      while candidate in ls:
              candidate = "{}_{}{}".format(fname,index,ext)
              index    += 1
-     if not os.path.exists(os.path.join(dir, odir)):
-         os.makedirs(os.path.join(dir, odir))
+    #  if not os.path.exists(os.path.join(dir, odir)):
+    #      os.makedirs(os.path.join(dir, odir))
 
-     return os.path.join(dir, odir, candidate)
+     return os.path.join(dir, candidate)
 
 
 ###############################################################################
