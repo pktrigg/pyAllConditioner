@@ -133,14 +133,10 @@ class ALLReader:
         date_object = datetime.strptime(str(recordDate), '%Y%m%d') + timedelta(0,recordTime)
         return date_object
 
-    def to_timestamp(self, recordDate):
-        '''return a unix timestamo from a pyhton date object'''
-        return (recordDate - datetime(1970, 1, 1)).total_seconds()
+    # def to_timestamp(self, dateObject):
+    #     '''return a unix timestamp from a python date object'''
+    #     return (dateObject - datetime(1970, 1, 1)).total_seconds()
 
-    def from_timestamp(self, unixtime):
-        '''return a python date object from a unix tiemstamp'''
-        return datetime.utcfromtimestamp(unixtime)
-        # return datetime(1970, 1 ,1) + timedelta(unixtime)
 
     def close(self):
         '''close the current file'''
@@ -261,7 +257,7 @@ class ALLReader:
                     selectedPositioningSystem = datagram.Descriptor
                 if (selectedPositioningSystem == datagram.Descriptor):
                     # for python 2.7
-                    navigation.append([self.to_timestamp(recDate), datagram.Latitude, datagram.Longitude])
+                    navigation.append([to_timestamp(recDate), datagram.Latitude, datagram.Longitude])
                     # for python 3.4
                     # navigation.append([recDate.timestamp(), datagram.Latitude, datagram.Longitude])
                     
@@ -669,7 +665,7 @@ class H_HEIGHT:
 
 ###############################################################################
 class H_HEIGHT_ENCODER:
-    def encode(self, height):
+    def encode(self, height, recordDate, recordTime, currentRecordTimeStamp, counter):
         '''Encode a Height datagram record'''
 
         header_fmt = '=LBBHLLHHlBBH'
@@ -680,11 +676,14 @@ class H_HEIGHT_ENCODER:
         fullDatagramByteCount = header_len
 
         # pack the header
-        self.Height = height
+        Height = height
+        HeightType = 0
+        STX = 2
+        TypeOfDatagram = 'H'
         ETX = 3
         checksum = 0
         recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.HeightType), ETX, checksum)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, ord(TypeOfDatagram), EMModel, RecordDate, recordTime, Counter, SerialNumber, int(Heading * 100), int(HeightType), ETX, checksum)
         fullDatagram = header
         return fullDatagram
 
@@ -1298,18 +1297,23 @@ class Y_SEABEDIMAGE:
         return fullDatagram
 
 
-
-
-
-def dateToSecondsSinceMidnight(dateObject):
-    return (dateObject - dateObject.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
+#######################
+# TIME HELPER FUNCTIONS
+#######################
+def to_timestamp(dateObject):
+    return (dateObject - datetime(1970, 1, 1)).total_seconds()
 
 def from_timestamp(unixtime):
     return datetime.utcfromtimestamp(unixtime)
-    # return datetime(1970, 1 ,1) + timedelta(unixtime)
 
 def dateToKongsbergDate(dateObject):
     return dateObject.strftime('%Y%m%d')
+
+def dateToKongsbergTime(dateObject):
+    return dateObject.strftime('%H%M%S')
+
+def dateToSecondsSinceMidnight(dateObject):
+    return (dateObject - dateObject.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
 
 ###############################################################################
 def crc16(data, bits=8):
@@ -1327,8 +1331,6 @@ def typecasting(crc):
     msb = hex(crc >> 8)
     lsb = hex(crc & 0x00FF)
     return lsb + msb
-def to_timestamp(recordDate):
-    return (recordDate - datetime(1970, 1, 1)).total_seconds()
 
 
 # # -*- coding: utf8 -*-

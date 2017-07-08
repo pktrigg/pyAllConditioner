@@ -123,7 +123,7 @@ def main():
             TypeOfDatagram, datagram = r.readDatagram()
             # kill off the leading records so we do not swamp the filewith unwanted records
             SRHSubset = deque(SRH.SRHData)
-            SRHSubset = trimInjectionData(r.to_timestamp(r.currentRecordDateTime()), SRHSubset)
+            SRHSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset)
             r.rewind()
 
         while r.moreData():
@@ -138,16 +138,16 @@ def main():
                 if TypeOfDatagram in args.exclude:
                     # dont trigger on records we are rejecting!        
                     continue
-                counter = injector(outFilePtr, r.recordDate, r.recordTime, r.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
+                counter = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
 
                 # this is a testbed until we figure out how caris handles the application of heave.
-                if TypeOfDatagram == 'X':
-                    datagram.read()
-                    # now encode the datagram back, making changes along the way
-                    datagram.TransducerDepth = 999
-                    dg = datagram.encode()
-                    outFilePtr.write(dg)
-                    continue #we do not want to write the records twice!
+                # if TypeOfDatagram == 'X':
+                #     datagram.read()
+                #     # now encode the datagram back, making changes along the way
+                #     datagram.TransducerDepth = 999
+                #     dg = datagram.encode()
+                #     outFilePtr.write(dg)
+                #     continue #we do not want to write the records twice!
 
             if extractBackscatter:
                 '''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
@@ -244,7 +244,7 @@ def trimInjectionData(recordTimestamp, SRHData):
     return SRHData
 
 ###############################################################################
-def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injectionData, counter):
+def injector(outFilePtr, currentRecordTimeStamp, injectionData, counter):
     '''inject data into the output file and pop the record from the injector'''
     if len(injectionData) == 0:
         return
@@ -258,8 +258,12 @@ def injector(outFilePtr, recordDate, recordTime, currentRecordTimeStamp, injecti
         # datagram = a.encode(recordsToAdd, counter)
         # outFilePtr.write(datagram)
 
+        date = pyall.from_timestamp(recordsToAdd[0][0])
+        recordDate = pyall.dateToKongsbergDate(date)
+        recordtime = pyall.dateToKongsbergTime(date)
+
         h = pyall.H_HEIGHT_ENCODER()
-        datagram = h.encode(recordsToAdd[0][1])
+        datagram = h.encode(recordsToAdd[0][1], recordDate, recordTime, currentRecordTimeStamp, counter)
         outFilePtr.write(datagram)
     return counter
 
