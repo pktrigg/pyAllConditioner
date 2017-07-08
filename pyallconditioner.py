@@ -162,7 +162,7 @@ def main():
                     for i in range(len(datagram.beams)):
                         arcIndex = round(beamPointingAngles[i]-startAngle) #quickly find the correct slot for the data
                         ARC[arcIndex].sampleSum = ARC[arcIndex].sampleSum + sum(datagram.beams[i].samples)
-                        ARC[arcIndex].sampleCount = ARC[arcIndex].sampleCount + len(datagram.beams[i].samples)
+                        ARC[arcIndex].numberOfSamplesPerBeam = ARC[arcIndex].numberOfSamplesPerBeam + len(datagram.beams[i].samples)
                         ARC[arcIndex].sector = transmitSector[i]
                 continue
             
@@ -196,10 +196,10 @@ def main():
     if extractBackscatter:
         print("Writing backscatter angular response curve to: %s" % outFileName)
         with open(outFileName, 'w') as f:
-            f.write("TakeOffAngle(Deg), BackscatterAmplitude(dB), Sector, %s \n" % args.inputFile )
+            f.write("TakeOffAngle(Deg), BackscatterAmplitude(dB), Sector, Correction, %s \n" % args.inputFile )
             for beam in ARC:
-                if beam.sampleCount > 0:
-                    f.write("%.3f, %.3f, %d \n" % (beam.takeOffAngle, (beam.sampleSum/beam.sampleCount)/10, beam.sector))
+                if beam.numberOfSamplesPerBeam > 0:
+                    f.write("%.3f, %.3f, %d \n" % (beam.takeOffAngle, (beam.sampleSum/beam.numberOfSamplesPerBeam)/10, beam.sector))
 
     update_progress("Process Complete: ", (fileCounter/len(matches)))
     if writeConditionedFile:
