@@ -37,65 +37,65 @@ def main():
     while r.moreData():
         # read a datagram.  If we support it, return the datagram type and aclass for that datagram
         # The user then needs to call the read() method for the class to undertake a fileread and binary decode.  This keeps the read super quick.
-        TypeOfDatagram, datagram = r.readDatagram()
-        print("TypeOfDatagram:", TypeOfDatagram)
+        typeOfDatagram, datagram = r.readDatagram()
+        print("typeOfDatagram:", typeOfDatagram)
         # print(r.currentRecordDateTime())
 
-        if TypeOfDatagram == '3':
+        if typeOfDatagram == '3':
             datagram.read()
             print (datagram.data)
             continue
 
-        if TypeOfDatagram == 'A':
+        if typeOfDatagram == 'A':
             datagram.read()
             # for a in datagram.Attitude:
             #     print ("%.5f, %.3f, %.3f, %.3f, %.3f" % (r.to_timestamp(r.to_DateTime(a[0], a[1])), a[3], a[4], a[5], a[6]))
             continue
 
-        if TypeOfDatagram == 'C':
+        if typeOfDatagram == 'C':
             datagram.read()
             continue
 
-        if TypeOfDatagram == 'D':
+        if typeOfDatagram == 'D':
             datagram.read()
             nadirBeam = int(datagram.NBeams / 2)
             # print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f Checksum %s" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth, datagram.checksum)))
             continue
         
-        if TypeOfDatagram == 'H':
+        if typeOfDatagram == 'H':
             datagram.read()
 
-        if TypeOfDatagram == 'I':
+        if typeOfDatagram == 'I':
             datagram.read()
             #  print (datagram.installationParameters)
             #  print ("Lat: %.5f Lon: %.5f" % (datagram.Latitude, datagram.Longitude))
             continue
 
-        if TypeOfDatagram == 'n':
+        if typeOfDatagram == 'n':
             datagram.read()
             continue
 
-        if TypeOfDatagram == 'N':
+        if typeOfDatagram == 'N':
             datagram.read()
             # print ("Raw Travel Times Recorded for %d beams" % datagram.NumReceiveBeams)
             continue
 
-        if TypeOfDatagram == 'R':
+        if typeOfDatagram == 'R':
             datagram.read()
             continue
 
-        if TypeOfDatagram == 'U':
+        if typeOfDatagram == 'U':
             datagram.read()
             continue
 
-        if TypeOfDatagram == 'X':
+        if typeOfDatagram == 'X':
             datagram.read()
             nadirBeam = int(datagram.NBeams / 2)
             # print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth)))
             pingCount += 1
             continue
 
-        if TypeOfDatagram == 'Y':
+        if typeOfDatagram == 'Y':
             datagram.read()
             continue
 
@@ -163,7 +163,7 @@ class ALLReader:
 
             numberOfBytes   = s[0]
             STX             = s[1]
-            TypeOfDatagram  = chr(s[2])
+            typeOfDatagram  = chr(s[2])
             EMModel         = s[3]
             RecordDate      = s[4]
             RecordTime      = float(s[5]/1000.0)
@@ -173,7 +173,7 @@ class ALLReader:
             # now reset file pointer
             self.fileptr.seek(curr, 0)
             # we need to add 4 bytes as the message does not contain the 4 bytes used to hold the size of the message
-            return numberOfBytes + 4, STX, TypeOfDatagram, EMModel, RecordDate, RecordTime
+            return numberOfBytes + 4, STX, typeOfDatagram, EMModel, RecordDate, RecordTime
         except struct.error:
             return 0,0,0,0,0,0
     
@@ -190,7 +190,7 @@ class ALLReader:
         count = 0
         self.rewind()
         while self.moreData():
-            numberOfBytes, STX, TypeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
+            numberOfBytes, STX, typeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
             self.fileptr.seek(numberOfBytes, 1)
             count += 1
         self.rewind()        
@@ -198,49 +198,49 @@ class ALLReader:
 
     def readDatagram(self):
         '''read the datagram header.  This permits us to skip datagrams we do not support'''
-        numberOfBytes, STX, TypeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
-        if TypeOfDatagram == '3': # 3_EXTRA PARAMETERS DECIMAL 51
+        numberOfBytes, STX, typeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
+        if typeOfDatagram == '3': # 3_EXTRA PARAMETERS DECIMAL 51
             dg = E_EXTRA(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 'A': # A ATTITUDE
+            return dg.typeOfDatagram, dg
+        if typeOfDatagram == 'A': # A ATTITUDE
             dg = A_ATTITUDE(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 'C': # C Clock 
+            return dg.typeOfDatagram, dg
+        if typeOfDatagram == 'C': # C Clock 
             dg = C_CLOCK(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'D': # D DEPTH
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'D': # D DEPTH
             dg = D_DEPTH(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 'H': # H Height  
+            return dg.typeOfDatagram, dg
+        if typeOfDatagram == 'H': # H Height  
             dg = H_HEIGHT(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'I': # I Installation 
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'I': # I Installation 
             dg = I_INSTALLATION(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'n': # n ATTITUDE
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'n': # n ATTITUDE
             dg = n_ATTITUDE(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 'N': # N Angle and Travel Time
+            return dg.typeOfDatagram, dg
+        if typeOfDatagram == 'N': # N Angle and Travel Time
             dg = N_TRAVELTIME(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 'R': # R_RUNTIME
+            return dg.typeOfDatagram, dg
+        if typeOfDatagram == 'R': # R_RUNTIME
             dg = R_RUNTIME(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'P': # P Position
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'P': # P Position
             dg = P_POSITION(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'U': # U Sound Velocity
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'U': # U Sound Velocity
             dg = U_SVP(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg
-        if TypeOfDatagram == 'X': # X Depth
+            return dg.typeOfDatagram, dg
+        if typeOfDatagram == 'X': # X Depth
             dg = X_DEPTH(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
-        if TypeOfDatagram == 'Y': # Y_SeabedImage
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'Y': # Y_SeabedImage
             dg = Y_SEABEDIMAGE(self.fileptr, numberOfBytes)
-            return dg.TypeOfDatagram, dg 
+            return dg.typeOfDatagram, dg 
         else:
-            dg = UNKNOWN_RECORD(self.fileptr, numberOfBytes, TypeOfDatagram)
-            return dg.TypeOfDatagram, dg
+            dg = UNKNOWN_RECORD(self.fileptr, numberOfBytes, typeOfDatagram)
+            return dg.typeOfDatagram, dg
             # self.fileptr.seek(numberOfBytes, 1)
 
     def loadNavigation(self, firstRecordOnly=False):    
@@ -249,8 +249,8 @@ class ALLReader:
         selectedPositioningSystem = None
         self.rewind()
         while self.moreData():
-            TypeOfDatagram, datagram = self.readDatagram()
-            if (TypeOfDatagram == 'P'):
+            typeOfDatagram, datagram = self.readDatagram()
+            if (typeOfDatagram == 'P'):
                 datagram.read()
                 recDate = self.currentRecordDateTime()
                 if (selectedPositioningSystem == None):
@@ -270,71 +270,71 @@ class ALLReader:
     def getDatagramName(typeOfDatagram):
         '''Convert the datagram type from the code to a user readable string.  Handy for displaying to the user'''
         #Multibeam Data
-        if (TypeOfDatagram == 'D'):
+        if (typeOfDatagram == 'D'):
             return "D_Depth"
-        if (TypeOfDatagram == 'X'):
+        if (typeOfDatagram == 'X'):
             return "XYZ_Depth"
-        if (TypeOfDatagram == 'K'):
+        if (typeOfDatagram == 'K'):
             return "K_CentralBeam"
-        if (TypeOfDatagram == 'F'):
+        if (typeOfDatagram == 'F'):
             return "F_RawRange"
-        if (TypeOfDatagram == 'f'):
+        if (typeOfDatagram == 'f'):
             return "f_RawRange"
-        if (TypeOfDatagram == 'N'):
+        if (typeOfDatagram == 'N'):
             return "N_RawRange"
-        if (TypeOfDatagram == 'S'):
+        if (typeOfDatagram == 'S'):
             return "S_SeabedImage"
-        if (TypeOfDatagram == 'Y'):
+        if (typeOfDatagram == 'Y'):
             return "Y_SeabedImage"
-        if (TypeOfDatagram == 'k'):
+        if (typeOfDatagram == 'k'):
             return "k_WaterColumn"
-        if (TypeOfDatagram == 'O'):
+        if (typeOfDatagram == 'O'):
             return "O_QualityFactor"
 
         # ExternalSensors
-        if (TypeOfDatagram == 'A'):
+        if (typeOfDatagram == 'A'):
             return "A_Attitude"
-        if (TypeOfDatagram == 'n'):
+        if (typeOfDatagram == 'n'):
             return "network_Attitude"
-        if (TypeOfDatagram == 'C'):
+        if (typeOfDatagram == 'C'):
             return "C_Clock"
-        if (TypeOfDatagram == 'h'):
+        if (typeOfDatagram == 'h'):
             return "h_Height"
-        if (TypeOfDatagram == 'H'):
+        if (typeOfDatagram == 'H'):
             return "H_Heading"
-        if (TypeOfDatagram == 'P'):
+        if (typeOfDatagram == 'P'):
             return "P_Position"
-        if (TypeOfDatagram == 'E'):
+        if (typeOfDatagram == 'E'):
             return "E_SingleBeam"
-        if (TypeOfDatagram == 'T'):
+        if (typeOfDatagram == 'T'):
             return "T_Tide"
 
         # SoundSpeed
-        if (TypeOfDatagram == 'G'):
+        if (typeOfDatagram == 'G'):
             return "G_SpeedSoundAtHead"
-        if (TypeOfDatagram == 'U'):
+        if (typeOfDatagram == 'U'):
             return "U_SpeedSoundProfile"
-        if (TypeOfDatagram == 'W'):
+        if (typeOfDatagram == 'W'):
             return "W_SpeedSOundProfileUsed"
 
         # Multibeam parameters       
-        if (TypeOfDatagram == 'I'):
+        if (typeOfDatagram == 'I'):
             return "I_Installation_Start"
-        if (TypeOfDatagram == 'i'):
+        if (typeOfDatagram == 'i'):
             return "i_Installation_Stop"
-        if (TypeOfDatagram == R):
+        if (typeOfDatagram == R):
             return "R_Runtime"
-        if (TypeOfDatagram == J):
+        if (typeOfDatagram == J):
             return "J_TransducerTilt"
-        if (TypeOfDatagram == '3'):
+        if (typeOfDatagram == '3'):
             return "3_ExtraParameters"
 
         # PU information and status
-        if (TypeOfDatagram == '0'):
+        if (typeOfDatagram == '0'):
             return "0_PU_ID"
-        if (TypeOfDatagram == '1'):
+        if (typeOfDatagram == '1'):
             return "1_PU_Status"
-        if (TypeOfDatagram == 'B'):
+        if (typeOfDatagram == 'B'):
             return "B_BIST_Result"
 
 
@@ -372,7 +372,7 @@ class A_ATTITUDE_ENCODER:
         footer_len = struct.calcsize(footer_fmt)
 
         STX = 2
-        TypeOfDatagram = 65
+        typeOfDatagram = 65
         model = 2045
 
         serialNumber = 999
@@ -386,7 +386,7 @@ class A_ATTITUDE_ENCODER:
         recordDate = int(dateToKongsbergDate(firstRecordDate))
         recordTime = int(dateToSecondsSinceMidnight(firstRecordDate)*1000)
         # we need to deduct 4 bytes as the field does not account for the 4-byte message length data which precedes the message
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, TypeOfDatagram, model, recordDate, recordTime, counter, serialNumber, numEntries)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, typeOfDatagram, model, recordDate, recordTime, counter, serialNumber, numEntries)
         fullDatagram = fullDatagram + header
         
         # now pack avery record from the list
@@ -416,7 +416,7 @@ class A_ATTITUDE_ENCODER:
 ###############################################################################
 class A_ATTITUDE:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'A'
+        self.typeOfDatagram = 'A'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -432,7 +432,7 @@ class A_ATTITUDE:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -467,7 +467,7 @@ class A_ATTITUDE:
 ###############################################################################
 class C_CLOCK:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'C'
+        self.typeOfDatagram = 'C'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -484,7 +484,7 @@ class C_CLOCK:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -501,7 +501,7 @@ class C_CLOCK:
 ###############################################################################
 class D_DEPTH:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'D'
+        self.typeOfDatagram = 'D'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -517,7 +517,7 @@ class D_DEPTH:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -588,7 +588,7 @@ class D_DEPTH:
 ###############################################################################
 class E_EXTRA:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = '3'
+        self.typeOfDatagram = '3'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -604,7 +604,7 @@ class E_EXTRA:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -634,7 +634,7 @@ class E_EXTRA:
 ###############################################################################
 class H_HEIGHT:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'h'
+        self.typeOfDatagram = 'h'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -651,7 +651,7 @@ class H_HEIGHT:
         s = rec_unpack(self.fileptr.read(rec_len))
 
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -665,32 +665,24 @@ class H_HEIGHT:
 
 ###############################################################################
 class H_HEIGHT_ENCODER:
-    def encode(self, height, recordDate, recordTime, currentRecordTimeStamp, counter):
+    def encode(self, height, recordDate, recordTime, counter):
         '''Encode a Height datagram record'''
-
-        header_fmt = '=LBBHLLHHlBBH'
-        header_len = struct.calcsize(header_fmt)
-
-        fullDatagram = bytearray()
-
-        fullDatagramByteCount = header_len
-
-        # pack the header
-        Height = height
-        HeightType = 0
+        rec_fmt = '=LBBHLLHHlBBH'
+        rec_len = struct.calcsize(rec_fmt)
+        heightType = 0 #0 = the height of the waterline at the vertical datum (from KM datagram manual)
+        serialNumber = 999
         STX = 2
-        TypeOfDatagram = 'H'
+        typeOfDatagram = 'h'
         ETX = 3
         checksum = 0
-        recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, ord(TypeOfDatagram), EMModel, RecordDate, recordTime, Counter, SerialNumber, int(Heading * 100), int(HeightType), ETX, checksum)
-        fullDatagram = header
-        return fullDatagram
+        model = 2045 #needs to be a sensible value to record is valid.  Maybe would be better to pass this from above
+        header = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType), ETX, checksum)
+        return header
 
 ###############################################################################
 class I_INSTALLATION:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'I'       # assign the KM code for this datagram type
+        self.typeOfDatagram = 'I'       # assign the KM code for this datagram type
         self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
         self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains. This includes the first 4 bytes represnting the number of bytes inthe datagram
         self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
@@ -708,7 +700,7 @@ class I_INSTALLATION:
         
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -733,7 +725,7 @@ class I_INSTALLATION:
 ###############################################################################
 class n_ATTITUDE:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'n'
+        self.typeOfDatagram = 'n'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -749,7 +741,7 @@ class n_ATTITUDE:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -788,7 +780,7 @@ class n_ATTITUDE:
 ###############################################################################
 class N_TRAVELTIME:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'N'
+        self.typeOfDatagram = 'N'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -805,7 +797,7 @@ class N_TRAVELTIME:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -887,7 +879,7 @@ class N_TRAVELTIME:
 ###############################################################################
 class P_POSITION:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'P'       # assign the KM code for this datagram type
+        self.typeOfDatagram = 'P'       # assign the KM code for this datagram type
         self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
         self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains
         self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
@@ -904,7 +896,7 @@ class P_POSITION:
         
         self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -954,7 +946,7 @@ def readFooter(numberOfBytes, fileptr):
 ###############################################################################
 class R_RUNTIME:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'R'       # assign the KM code for this datagram type
+        self.typeOfDatagram = 'R'       # assign the KM code for this datagram type
         self.offset = fileptr.tell()    # remember where this packet resides in the file so we can return if needed
         self.numberOfBytes = numberOfBytes              # remember how many bytes this packet contains
         self.fileptr = fileptr          # remember the file pointer so we do not need to pass from the host process
@@ -971,7 +963,7 @@ class R_RUNTIME:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = s[5]/1000
@@ -1012,7 +1004,7 @@ class R_RUNTIME:
 class UNKNOWN_RECORD:
     '''used as a convenience tool for datagrams we have no bespoke classes.  Better to make a bespoke class'''
     def __init__(self, fileptr, numberOfBytes, typeOfDatagram):
-        self.TypeOfDatagram = typeOfDatagram
+        self.typeOfDatagram = typeOfDatagram
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -1024,7 +1016,7 @@ class UNKNOWN_RECORD:
 ###############################################################################
 class U_SVP:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'U'
+        self.typeOfDatagram = 'U'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -1039,7 +1031,7 @@ class U_SVP:
         s = rec_unpack(self.fileptr.read(rec_len))
 
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -1070,7 +1062,7 @@ class U_SVP:
 ###############################################################################
 class X_DEPTH:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'X'
+        self.typeOfDatagram = 'X'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -1086,7 +1078,7 @@ class X_DEPTH:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = s[5]/1000
@@ -1167,7 +1159,7 @@ class X_DEPTH:
 
         # pack the header
         recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.TransducerDepth, self.NBeams, self.NValidDetections, self.SamplingFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.typeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.TransducerDepth, self.NBeams, self.NValidDetections, self.SamplingFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3)
         fullDatagram = fullDatagram + header
 
         # pack the beam summary info
@@ -1187,7 +1179,7 @@ class X_DEPTH:
 ###############################################################################
 class Y_SEABEDIMAGE:
     def __init__(self, fileptr, numberOfBytes):
-        self.TypeOfDatagram = 'Y'
+        self.typeOfDatagram = 'Y'
         self.offset = fileptr.tell()
         self.numberOfBytes = numberOfBytes
         self.fileptr = fileptr
@@ -1204,7 +1196,7 @@ class Y_SEABEDIMAGE:
 
         # self.numberOfBytes   = s[0]
         self.STX             = s[1]
-        self.TypeOfDatagram  = chr(s[2])
+        self.typeOfDatagram  = chr(s[2])
         self.EMModel         = s[3]
         self.RecordDate      = s[4]
         self.Time            = float(s[5]/1000.0)
@@ -1271,7 +1263,7 @@ class Y_SEABEDIMAGE:
 
         # pack the header
         recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.TypeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, self.SampleFrequency, self.RangeToNormalIncidence, self.NormalIncidence, self.ObliqueBS, self.TxBeamWidth, self.TVGCrossOver, self.NumBeams)
+        header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.typeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, self.SampleFrequency, self.RangeToNormalIncidence, self.NormalIncidence, self.ObliqueBS, self.TxBeamWidth, self.TVGCrossOver, self.NumBeams)
         fullDatagram = fullDatagram + header
 
         # pack the beam summary info

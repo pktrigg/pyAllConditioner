@@ -19,14 +19,15 @@ from collections import deque
 def main():
     parser = ArgumentParser(description='Read Kongsberg ALL file and condition the file by removing redundant records and injecting updated information to make the file self-contained.',
             epilog='Example: \n To condition a single file use -i c:/temp/myfile.all \n to condition all files in a folder use -i c:/temp/*.all\n To condition all .all files recursively in a folder, use -r -i c:/temp \n To condition all .all files recursively from the current folder, use -r -i ./ \n', formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-i', dest='inputFile', action='store', help='-i <ALLfilename> : Input ALL filename to image. It can also be a wildcard, e.g. *.all')
-    parser.add_argument('-exclude', dest='exclude', action='store', default="", help='-exclude <datagramsID[s]> : eXclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
-    parser.add_argument('-srh', dest='SRHInjectFileName', action='store', default="", help='-srh <filename[s]> : inJect this attitude file as A datagrams.  This will automatically remove existing A_ATTITUDE and n_NetworkAttitude datagrams. e.g. -srh "*.srh" (Hint: remember the quotes!)')
-    parser.add_argument('-conditionbs', dest='conditionbs', action='store', default="", help='-conditionbs <filename> : improve the Y_SeabedImage datagrams by adding a CSV correction file. eg. -conditionbs c:\angularResponse.csv')
-    parser.add_argument('-odir', dest='odir', action='store', default="", help='-odir <folder> : specify a relative output folder e.g. -odir conditioned')
-    parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='-extractbs : extract backscatter from Y datagram so we can analyse. [Default: False]')
-    parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='-r : search Recursively.  [Default: False]')
-    parser.add_argument('-svp', action='store_true', default=False, dest='svp', help='-svp : output the SVP from the sound velocity datagram.  [Default: False]')
+    parser.add_argument('-i', dest='inputFile', action='store', help='Input ALL filename to image. It can also be a wildcard, e.g. *.all')
+    parser.add_argument('-exclude', dest='exclude', action='store', default="", help='Exclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
+    parser.add_argument('-srh', dest='SRHInjectFileName', action='store', default="", help='Inject this attitude file as A datagrams. e.g. -srh "*.srh" (Hint: remember the quotes!)')
+    parser.add_argument('-conditionbs', dest='conditionbs', action='store', default="", help='Improve the Y_SeabedImage datagrams by adding a CSV correction file. eg. -conditionbs c:/angularResponse.csv')
+    parser.add_argument('-odir', dest='odir', action='store', default="", help='Specify a relative output folder e.g. -odir conditioned')
+    parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='Extract backscatter from Y datagram so we can analyse. [Default: False]')
+    parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='Search Recursively from the current folder.  [Default: False]')
+    parser.add_argument('-svp', action='store_true', default=False, dest='svp', help='Output a CARIS compatible SVP file based on the sound velocity datagram.  [Default: False]')
+
     if len(sys.argv)==1:
         parser.print_help()
         sys.exit(1)
@@ -44,7 +45,6 @@ def main():
     latitude = 0
     longitude = 0
 
-    
     if args.recursive:
         for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
             for f in fnmatch.filter(filenames, '*.all'):
@@ -76,6 +76,7 @@ def main():
 
     if args.extractbs:
         extractBackscatter = True
+        writeConditionedFile= False #we do not need to write out a .all file
         # we need a generic set of beams into which we can insert individual ping data.  Thhis will be the angular respnse curve
         beamdetail = [0,0,0,0]
         startAngle = -90
@@ -94,24 +95,24 @@ def main():
         SRH = SRHReader()
         SRH.loadFiles(args.SRHInjectFileName) # load all the filenames
         print ("Records to inject: %d" % len(SRH.SRHData))
-        # auto exclude attitude records
-        args.exclude = 'n'
+        # auto exclude attitude records.  on reflection, we should probably NOT do this.
+        # args.exclude = 'n'
 
     if args.svp:
         extractSVP=True
+        writeConditionedFile= False #we do not need to write out a .all file
 
     for filename in matches:
 
         if writeConditionedFile:
             # create an output file based on the input
             outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
-            outFileName  = createOutputFileName(filename)
+            outFileName  = createOutputFileName(outFileName)
             outFilePtr = open(outFileName, 'wb')
             print ("writing to file: %s" % outFileName)
 
-        counter = 0
-        
         r = pyall.ALLReader(filename)
+        counter = 0
 
         if extractSVP:
             # we need the position of the SVP dip in the SVP file, so use the first position record in the file.
@@ -208,6 +209,7 @@ def main():
 
 ###############################################################################
 def extractProfile(datagram, TypeOfDatagram, currentRecordDateTime, latitude, longitude, filename, odir):
+    '''extract the SVP profile and save it to a file for use with CARIS'''
     if (TypeOfDatagram == 'P'):
         datagram.read()
         # remember the current position, so we can use it for the SVP extraction
@@ -258,13 +260,14 @@ def injector(outFilePtr, currentRecordTimeStamp, injectionData, counter):
         # datagram = a.encode(recordsToAdd, counter)
         # outFilePtr.write(datagram)
 
+        # encode and inject a H_HEIGHT record containing Heave so CARIS can apply it in processing without the need to re-refract from range/bearing
         date = pyall.from_timestamp(recordsToAdd[0][0])
         recordDate = pyall.dateToKongsbergDate(date)
-        recordtime = pyall.dateToKongsbergTime(date)
-
+        recordTime = pyall.dateToKongsbergTime(date)
         h = pyall.H_HEIGHT_ENCODER()
-        datagram = h.encode(recordsToAdd[0][1], recordDate, recordTime, currentRecordTimeStamp, counter)
+        datagram = h.encode(recordsToAdd[0][1], recordDate, recordTime, counter)
         outFilePtr.write(datagram)
+        counter = counter + 1
     return counter
 
 # ###############################################################################
