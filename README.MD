@@ -23,6 +23,7 @@ implement -splitduration
 
 Done
 ====
+SVP filename is now more ligical and imports multiple SVP's if present in .all file.
 Implemented extraction of SVP so we can easily consume the profile in CARIS
 Implement -inject <filename> to inject .srh delayed heave into the .all file.
     read file for injection into memory with an essential time field
@@ -44,17 +45,60 @@ Implement attitude injection
 Implement writing of the new file.  by default use append _1.all to make a new filename
 Implement -x <recordIdentifiers> to exclude records from the output, eg -x PA to remove the position (P) and attitude (A) records.  Note this needs to be case sensitive
 
-Example
+Examples
 -------
 
 To see the command line help...
 ```
 python pyAllConditioner.py
 ```
-To create a strip attitude records a .all file...
+To exclude 'A' attitude datagrams .all file...
 ```
-python pyall2shp.py -i <filename.all> -x A
+python pyallconditioner.py -i <filename.all> -exclude A
 ```
+To strip non-essential records from .all file for pushing back2base
+```
+python pyallconditioner.py -i <filename.all> -exclude nYNC0
+Note: this will remove the 'n' network attitude, 'Y' seabed imagery, 'N' raw range, 'C' clock, '0' extra datagrams.  In an example .all file, this reduced the file size from 418Mb to 126Mb. You can then zip that up into 86Mb for shipping.  
+```
+
+To EXTRACT SVP profiles from the .all file into an ASCII format which can be imported directly into CARIS
+```
+python pyallconditioner.py -i <filename.all> -svp
+
+The resulting svp file will look like this...
+[SVP_Version_2]
+d:\projects\RVInvestigator\0073_20161001_103120_Investigator_em710.all
+Section 2016-274 10:31:20 -21:58:7.988 151:25:33.901
+0.000 1534.600 
+4.970 1534.600 
+5.960 1534.600 
+6.960 1534.600 
+etc
+The date and position will be extracted from the .all file, which makes this very easy to manage in CARIS
+```
+
+To EXTRACT ANGULAR RESPONSE CURVES from the 'Y' seabed image datagrams, 
+```
+python pyallconditioner.py -i <filename.all> -extractbs
+
+This will create an ASCII CSV file with a 1 degree resolution of angle, ampliture response and transmit sector.  The amplitudes represent the average amplitude for all samples in that angle range (+/-0.5degree).  Take this file and plot it in excel to reveal how well balanaced the varius transmit sectors are.  Using excel it is then very easy to create an additional 'correction' column which can be applied to the 'Y' datagrams using the -conditionbs option within this tool.
+
+```
+
+To INJECT .srh files (seapath real heave)
+```
+python pyallconditioner.py -i <filename.all> -srh "*.srh"
+This option will read one or multiple srh files, sort them into ascending data order, import them and inject them into a new .all file in the correct locations (interleaving) by inserting a 'A' attitude datagram with a system #2 identifier, descriptor of not_in_use and zero for the roll, pitch and heading fields.  
+This option is very useful for ensuring the .all files are self-contained (everything you need is in the 1 spot), durable (less chance of losing auxiliary data files), portable (it is much easier to send 1 file than forget to send all files used in processing) and open (the .all file format) is well documented and understood by many applications.
+If needed, the existing attitude records can be excluded from the process, but under normal circumstances this is not recommended.
+
+```
+
+
+
+
+
 
 output
 ------
