@@ -23,22 +23,25 @@ def main():
     # filename =   "C:/Python27/ArcGIS10.3/pyall-master/0314_20170421_222154_SA1702-FE_302.all"
     # filename =   "C:/development/Python/m3Sample.all"
     # filename = "C:/development/python/0004_20110307_041009.all"
-    # filename = "C:/development/python/sample.all"
-    filename = "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"
+    filename = "C:/development/python/sample.all"
+    # filename = "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"
     # filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
+    filename = "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all"
+
     r = ALLReader(filename)
     pingCount = 0
     start_time = time.time() # time the process
 
-    navigation = r.loadNavigation()
-    print("Load Navigation Duration: %.2fs" % (time.time() - start_time)) # time the process
-    print (navigation)
+    # navigation = r.loadNavigation()
+    # print("Load Navigation Duration: %.2fs" % (time.time() - start_time)) # time the process
+    # print (navigation)
 
     while r.moreData():
         # read a datagram.  If we support it, return the datagram type and aclass for that datagram
         # The user then needs to call the read() method for the class to undertake a fileread and binary decode.  This keeps the read super quick.
         typeOfDatagram, datagram = r.readDatagram()
-        print("typeOfDatagram:", typeOfDatagram)
+        print(typeOfDatagram, end='')
+        
         # print(r.currentRecordDateTime())
 
         if typeOfDatagram == '3':
@@ -172,7 +175,14 @@ class ALLReader:
 
             # now reset file pointer
             self.fileptr.seek(curr, 0)
+    
             # we need to add 4 bytes as the message does not contain the 4 bytes used to hold the size of the message
+            # trap corrupt datagrams at the end of a file.  We see this in EM2040 systems.
+            if (curr + numberOfBytes + 4 ) >= self.fileSize:
+                numberOfBytes = self.fileSize - curr - 4
+                typeOfDatagram = 'XXX'
+                return numberOfBytes + 4, STX, typeOfDatagram, EMModel, RecordDate, RecordTime
+    
             return numberOfBytes + 4, STX, typeOfDatagram, EMModel, RecordDate, RecordTime
         except struct.error:
             return 0,0,0,0,0,0
@@ -199,6 +209,7 @@ class ALLReader:
     def readDatagram(self):
         '''read the datagram header.  This permits us to skip datagrams we do not support'''
         numberOfBytes, STX, typeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
+        
         if typeOfDatagram == '3': # 3_EXTRA PARAMETERS DECIMAL 51
             dg = E_EXTRA(self.fileptr, numberOfBytes)
             return dg.typeOfDatagram, dg
@@ -346,8 +357,8 @@ class cBeam:
         self.numberOfSamplesPerBeam = beamDetail[2]
         self.centreSampleNumber     = beamDetail[3]
         self.sector                 = 0
-        self.takeOffAngle           = angle
-        self.sampleSum              = 0
+        self.takeOffAngle           = angle     # used for ARC computation
+        self.sampleSum              = 0         # used for backscatter ARC computation process
         self.samples                = []
 
 ###############################################################################
@@ -853,10 +864,11 @@ class N_TRAVELTIME:
         rx_rec_fmt = '=hBBHBbfhbB'
         rx_rec_len = struct.calcsize(rx_rec_fmt)
         rx_rec_unpack = struct.Struct(rx_rec_fmt).unpack
+
         for i in range(self.NumReceiveBeams):
             data = self.fileptr.read(rx_rec_len)
-            bytesRead += rx_rec_len
             rx_s = rx_rec_unpack(data)
+            bytesRead += rx_rec_len
             self.BeamPointingAngle[i] = float (rx_s[0]) / float (100)
             self.TransmitSectorNumber[i] = rx_s[1]
             self.DetectionInfo[i] = rx_s[2]
@@ -1185,8 +1197,9 @@ class Y_SEABEDIMAGE:
         self.fileptr = fileptr
         self.fileptr.seek(numberOfBytes, 1)
         self.data = ""
-        self.ARC = []
-        
+        self.ARC = {}
+        self.BeamPointingAngle=[]
+
     def read(self):
         self.fileptr.seek(self.offset, 0)
         rec_fmt = '=LBBHLLHHfHhhHHH'
@@ -1267,14 +1280,19 @@ class Y_SEABEDIMAGE:
         fullDatagram = fullDatagram + header
 
         # pack the beam summary info
-        for b in self.beams:
+        s = []
+        for i,b in enumerate (self.beams):
             bodyRecord = struct.pack(rec_fmt, b.sortingDirection, b.detectionInfo, b.numberOfSamplesPerBeam, b.centreSampleNumber)
             fullDatagram = fullDatagram + bodyRecord
-
+            # using the takeoffangle, we need to look up the correction from the ARC and apply it to the samples.
+            a = round(self.BeamPointingAngle[i],0)
+            correction = self.ARC[a]
+            for sample in b.samples:
+                s.append(int(sample + correction))
         # now add the ARC correction based on the take off angles 
-        s = list(self.samples)
-        for i in range(len(s)):
-            s[i] = 0            
+        # s = list(self.samples)
+        # for i in range(len(s)):
+        #     s[i] = 0            
         # pack the actual seabed imagery
         sampleRecord = struct.pack(sample_fmt, *s)
         fullDatagram = fullDatagram + sampleRecord

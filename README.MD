@@ -23,6 +23,8 @@ implement -splitduration
 
 Done
 ====
+backscatter ARC now saves the sum and count, so users can understand how reliable the resulting ARC is.
+backscatter ARC now computes a correction column so the apply option in this tool becomes useful
 SVP filename is now more ligical and imports multiple SVP's if present in .all file.
 Implemented extraction of SVP so we can easily consume the profile in CARIS
 Implement -inject <filename> to inject .srh delayed heave into the .all file.

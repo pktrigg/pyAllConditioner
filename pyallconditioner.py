@@ -1,3 +1,9 @@
+#name:          pyALLConditioner
+#created:       April 2017
+#by:            p.kennedy@fugro.com
+#description:   python module to pre-process a Kongsberg ALL sonar file and do useful hings with it
+#               See readme.md for more details
+
 import csv
 import sys
 import time
@@ -10,10 +16,11 @@ from datetime import timedelta
 from glob import glob
 import pyall
 import struct
-from bisect import bisect_left, bisect_right
+# from bisect import bisect_left, bisect_right
 import sortedcollection
 from operator import itemgetter
 from collections import deque
+
 
 ###############################################################################
 def main():
@@ -66,10 +73,15 @@ def main():
         print ("Excluding datagrams: %s :" % args.exclude)
 
     if len(args.conditionbs) > 0:
+        beamPointingAngles = []
         if not os.path.exists(args.conditionbs):
             print ("oops: backscatter conditioning filename does not exist, please try again: %s" % args.conditionbs)
             exit()
-        ARC = loadCSVFile(args.conditionbs)
+        ARCList = loadCSVFile(args.conditionbs)
+        ARCList.pop(0)
+        ARC = {}
+        for item in ARCList:
+            ARC[float(item[0])] = float(item[5])
         print ("Conditioning Y_SeabedImage datagrams with: %s :" % args.conditionbs)
         conditionBS = True
         args.exclude = 'Y' # we need to NOT write out the original data as we will be creating new records
@@ -158,6 +170,8 @@ def main():
                     beamPointingAngles = datagram.BeamPointingAngle
                     transmitSector = datagram.TransmitSectorNumber
                 if TypeOfDatagram == 'Y':
+                    if len(beamPointingAngles)==0:
+                        continue #we dont yet have any raw ranges so we dont have a beam pattern so skip
                     datagram.read()
                     for i in range(len(datagram.beams)):
                         arcIndex = round(beamPointingAngles[i]-startAngle) #quickly find the correct slot for the data
@@ -170,10 +184,12 @@ def main():
                 if TypeOfDatagram == 'N':
                     datagram.read()
                     beamPointingAngles = datagram.BeamPointingAngle
-                    transmitSector = datagram.TransmitSectorNumber
                 if TypeOfDatagram == 'Y':
+                    if len(beamPointingAngles)==0:
+                        continue #we dont yet have any raw ranges so we dont have a beam pattern so skip
                     datagram.read()
                     datagram.ARC = ARC
+                    datagram.BeamPointingAngle = beamPointingAngles
                     bytes = datagram.encode()
                     outFilePtr.write(bytes)
 
@@ -195,11 +211,23 @@ def main():
     # print out the extracted backscatter angular response curve
     if extractBackscatter:
         print("Writing backscatter angular response curve to: %s" % outFileName)
+        
+        # compute the mean response across the swath
+        responseSum = 0
+        responseCount = 0
+        for beam in ARC:
+            if beam.numberOfSamplesPerBeam > 0:
+                responseSum = responseSum = (beam.sampleSum/10) #tenths of a dB
+                responseCount = responseCount = beam.numberOfSamplesPerBeam
+        responseAverage = responseSum/responseCount
+
         with open(outFileName, 'w') as f:
-            f.write("TakeOffAngle(Deg), BackscatterAmplitude(dB), Sector, Correction, %s \n" % args.inputFile )
+            # write out the backscatter response curve
+            f.write("TakeOffAngle(Deg), BackscatterAmplitude(dB), Sector, SampleSum, SampleCount, Correction, %s \n" % args.inputFile )
             for beam in ARC:
                 if beam.numberOfSamplesPerBeam > 0:
-                    f.write("%.3f, %.3f, %d \n" % (beam.takeOffAngle, (beam.sampleSum/beam.numberOfSamplesPerBeam)/10, beam.sector))
+                    beamARC = (beam.sampleSum/beam.numberOfSamplesPerBeam)
+                    f.write("%.3f, %.3f, %d, %d, %d, %.3f\n" % (beam.takeOffAngle, beamARC, beam.sector, beam.sampleSum, beam.numberOfSamplesPerBeam , (-1.0 * beamARC) + responseAverage))
 
     update_progress("Process Complete: ", (fileCounter/len(matches)))
     if writeConditionedFile:
@@ -322,6 +350,9 @@ def createOutputFileName(path):
      '''Create a valid output filename. if the name of the file already exists the file name is auto-incremented.'''
      path      = os.path.expanduser(path)
 
+     if not os.path.exists(os.path.dirname(path)):
+         os.makedirs(os.path.dirname(path))
+
      if not os.path.exists(path):
         return path
 
@@ -334,8 +365,6 @@ def createOutputFileName(path):
      while candidate in ls:
              candidate = "{}_{}{}".format(fname,index,ext)
              index    += 1
-    #  if not os.path.exists(os.path.join(dir, odir)):
-    #      os.makedirs(os.path.join(dir, odir))
 
      return os.path.join(dir, candidate)
 
