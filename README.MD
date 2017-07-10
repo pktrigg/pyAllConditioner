@@ -18,6 +18,9 @@ Backscatter conditioning:
     write out the new datagram by modifying the raw bytes 
 
 implement -splitdepthmode
+    we need to store the installation records start and end, 
+    We then start spooling the datagrams into s file which will have a sensible name eg <filename>_mode.all.  
+    We then close the file each time there is a change in the depth mode within the runtime datagrams, and open a new file
 implement -splitsize
 implement -splitduration
 

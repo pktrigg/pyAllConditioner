@@ -14,11 +14,13 @@
                 "RedirectOutput"
             ],
             
-            "args": ["-odir", "conditioned", "-i", "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all", "-conditionbs", "c:/projects/carisworldtour/preprocess/conditioned/angularResponseCurve.csv"]
+            "args": ["-odir", "conditioned", "-i", "C:/development/python/EM302/1501_20140905_174928_Fugro_Equator_GA4421.all", "-splitd"]
         }
    ]
 }
+            "args": ["-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710_Original.all", "-splitd"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
+            "args": ["-odir", "conditioned", "-i", "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all", "-conditionbs", "c:/projects/carisworldtour/preprocess/conditioned/angularResponseCurve.csv"]
             "args": ["-svp", "-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "c:/projects/RVInvestigator/SRH_20161001_1475320090.srh"]
             "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]

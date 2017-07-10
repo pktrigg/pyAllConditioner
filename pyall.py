@@ -26,7 +26,7 @@ def main():
     filename = "C:/development/python/sample.all"
     # filename = "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"
     # filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
-    filename = "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all"
+    # filename = "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all"
 
     r = ALLReader(filename)
     pingCount = 0
@@ -67,6 +67,10 @@ def main():
         
         if typeOfDatagram == 'H':
             datagram.read()
+
+        if typeOfDatagram == 'i':
+            datagram.read()
+            continue
 
         if typeOfDatagram == 'I':
             datagram.read()
@@ -178,7 +182,7 @@ class ALLReader:
     
             # we need to add 4 bytes as the message does not contain the 4 bytes used to hold the size of the message
             # trap corrupt datagrams at the end of a file.  We see this in EM2040 systems.
-            if (curr + numberOfBytes + 4 ) >= self.fileSize:
+            if (curr + numberOfBytes + 4 ) > self.fileSize:
                 numberOfBytes = self.fileSize - curr - 4
                 typeOfDatagram = 'XXX'
                 return numberOfBytes + 4, STX, typeOfDatagram, EMModel, RecordDate, RecordTime
@@ -225,8 +229,12 @@ class ALLReader:
         if typeOfDatagram == 'H': # H Height  
             dg = H_HEIGHT(self.fileptr, numberOfBytes)
             return dg.typeOfDatagram, dg 
-        if typeOfDatagram == 'I': # I Installation 
+        if typeOfDatagram == 'I': # I Installation (Start)
             dg = I_INSTALLATION(self.fileptr, numberOfBytes)
+            return dg.typeOfDatagram, dg 
+        if typeOfDatagram == 'i': # i Installation (Stop)
+            dg = I_INSTALLATION(self.fileptr, numberOfBytes)
+            dg.typeOfDatagram = 'i' #override with the install stop code
             return dg.typeOfDatagram, dg 
         if typeOfDatagram == 'n': # n ATTITUDE
             dg = n_ATTITUDE(self.fileptr, numberOfBytes)
@@ -254,6 +262,29 @@ class ALLReader:
             return dg.typeOfDatagram, dg
             # self.fileptr.seek(numberOfBytes, 1)
 
+###############################################################################
+    def loadInstallationRecords(self):    
+        '''loads all the navigation into lists'''
+        
+        installStart = None
+        installStop = None
+        initialMode = None
+        self.rewind()
+        while self.moreData():
+            typeOfDatagram, datagram = self.readDatagram()
+            # print (typeOfDatagram, end='')
+            if (typeOfDatagram == 'I'):
+                installStart = self.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
+            if (typeOfDatagram == 'i'):
+                datagram.read()
+                installStop = self.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
+            if (initialMode == None and typeOfDatagram == 'R'):
+                datagram.read()
+                initialMode = datagram.DepthMode
+        self.rewind()
+        return installStart, installStop, initialMode        
+
+###############################################################################
     def loadNavigation(self, firstRecordOnly=False):    
         '''loads all the navigation into lists'''
         navigation = []
@@ -1007,10 +1038,63 @@ class R_RUNTIME:
         self.maximumStbdCoverageDegrees     = s[29]
         self.maximumStbdWidth               = s[30]
         self.transmitAAlongTilt             = s[31]
-        self.filterIdentifier               = s[32]
+        self.filterIdentifier2               = s[32]
         self.ETX                            = s[33]
         self.checksum                       = s[34]
+
+        self.DepthMode = "VeryShallow"
+        if (isBitSet(self.mode, 0)):
+            self.DepthMode = "Shallow"
+        if (isBitSet(self.mode, 1)):
+            self.DepthMode = "Medium"
+        if (isBitSet(self.mode, 0) & (isBitSet(self.mode, 1))):
+            self.DepthMode = "VeryDeep"
+        if (isBitSet(self.mode, 2)):
+            self.DepthMode = "VeryDeep"
+        if (isBitSet(self.mode, 0) & (isBitSet(self.mode, 2))):
+            self.DepthMode = "VeryDeep"
+
+        if str(self.EMModel) in 'EM2040, EM2045':
+            self.DepthMode = "200kHz"
+            if (isBitSet(self.mode, 0)):
+                self.DepthMode = "300kHz"
+            if (isBitSet(self.mode, 1)):
+                self.DepthMode = "400kHz"
             
+        self.TXPulseForm = "CW"
+        if (isBitSet(self.mode, 4)):
+            self.TXPulseForm = "Mixed"
+        if (isBitSet(self.mode, 5)):
+            self.TXPulseForm = "FM"
+
+        self.dualSwathMode = "Off";
+        if (isBitSet(self.mode, 6)):
+            dualSwathMode = "Fixed";
+        if (isBitSet(self.mode, 7)):
+            dualSwathMode = "Dynamic";
+
+        self.filterSetting = "SpikeFilterOff";
+        if (isBitSet(self.filterIdentifier, 0)):
+            self.filterSetting = "SpikeFilterWeak";
+        if (isBitSet(self.filterIdentifier, 1)):
+            self.filterSetting = "SpikeFilterMedium";
+        if (isBitSet(self.filterIdentifier, 0) & (isBitSet(self.filterIdentifier, 1))):
+            self.filterSetting = "SpikeFilterMedium";
+        if (isBitSet(self.filterIdentifier, 2)):
+            self.filterSetting += "+SlopeOn";
+        if (isBitSet(self.filterIdentifier, 3)):
+            self.filterSetting += "+SectorTrackingOn";
+        if ((not isBitSet(self.filterIdentifier, 4)) & (not isBitSet(self.filterIdentifier, 7))):
+            self.filterSetting += "+RangeGatesNormal";
+        if ((isBitSet(self.filterIdentifier, 4)) & (not isBitSet(self.filterIdentifier, 7))):
+            self.filterSetting += "+RangeGatesLarge";
+        if ((not isBitSet(self.filterIdentifier, 4)) & (isBitSet(self.filterIdentifier, 7))):
+            self.filterSetting += "+RangeGatesSmall";
+        if (isBitSet(self.filterIdentifier, 5)):
+            self.filterSetting += "+AerationFilterOn";
+        if (isBitSet(self.filterIdentifier, 6)):
+            self.filterSetting += "+InterferenceFilterOn";
+        return
 
 ###############################################################################
 class UNKNOWN_RECORD:
@@ -1324,6 +1408,15 @@ def dateToKongsbergTime(dateObject):
 
 def dateToSecondsSinceMidnight(dateObject):
     return (dateObject - dateObject.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
+
+ 
+def isBitSet(int_type, offset):
+    '''testBit() returns a nonzero result, 2**offset, if the bit at 'offset' is one.'''
+    mask = 1 << offset
+    return (int_type & (1 << offset)) != 0
+
+def swap16(i):
+    return struct.unpack("<H", struct.pack(">H", i))[0]
 
 ###############################################################################
 def crc16(data, bits=8):

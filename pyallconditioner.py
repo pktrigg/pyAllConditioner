@@ -34,6 +34,7 @@ def main():
     parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='Extract backscatter from Y datagram so we can analyse. [Default: False]')
     parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='Search Recursively from the current folder.  [Default: False]')
     parser.add_argument('-svp', action='store_true', default=False, dest='svp', help='Output a CARIS compatible SVP file based on the sound velocity datagram.  [Default: False]')
+    parser.add_argument('-splitd', action='store_true', default=False, dest='splitd', help='split the .all file every time the depth mode changes.  [Default: False]')
 
     if len(sys.argv)==1:
         parser.print_help()
@@ -114,8 +115,11 @@ def main():
         extractSVP=True
         writeConditionedFile= False #we do not need to write out a .all file
 
-    for filename in matches:
+    if args.splitd:
+        splitd=True
+        initialDepthMode = ""
 
+    for filename in matches:
         if writeConditionedFile:
             # create an output file based on the input
             outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
@@ -125,6 +129,9 @@ def main():
 
         r = pyall.ALLReader(filename)
         counter = 0
+
+        if splitd:
+            InstallStart, InstallEnd, initialDepthMode = r.loadInstallationRecords()
 
         if extractSVP:
             # we need the position of the SVP dip in the SVP file, so use the first position record in the file.
@@ -146,6 +153,23 @@ def main():
             # read the bytes into a buffer 
             rawBytes = r.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
 
+            if splitd:
+                if TypeOfDatagram == 'R':
+                    datagram.read()
+                    if initialDepthMode is not datagram.DepthMode:
+                        # write out the closing install record then close the file
+                        print ("closing the file as the depth mode has changed")
+                        outFilePtr.write(InstallEnd)
+                        outFilePtr.close()
+                        
+                        outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.splitext(filename)[0] + "_" + datagram.DepthMode + "." + os.path.splitext(filename)[1],)
+                        outFileName  = createOutputFileName(outFileName)
+                        outFilePtr = open(outFileName, 'wb')
+                        print ("writing to split file: %s" % outFileName)
+                        outFilePtr.write(InstallStart)
+                        outFilePtr.write(rawBytes)
+                        initialDepthMode = datagram.DepthMode #remember the new depth mode!
+                        
             # before we write the datagram out, we need to inject records with a smaller from_timestamp
             if inject:                    
                 if TypeOfDatagram in args.exclude:
@@ -284,9 +308,9 @@ def injector(outFilePtr, currentRecordTimeStamp, injectionData, counter):
     
     if len(recordsToAdd) > 0:
         # counter = counter + 1
-        # a = pyall.A_ATTITUDE_ENCODER()
-        # datagram = a.encode(recordsToAdd, counter)
-        # outFilePtr.write(datagram)
+        a = pyall.A_ATTITUDE_ENCODER()
+        datagram = a.encode(recordsToAdd, counter)
+        outFilePtr.write(datagram)
 
         # encode and inject a H_HEIGHT record containing Heave so CARIS can apply it in processing without the need to re-refract from range/bearing
         date = pyall.from_timestamp(recordsToAdd[0][0])
