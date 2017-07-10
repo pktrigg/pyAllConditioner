@@ -50,6 +50,7 @@ def main():
     writeConditionedFile = True
     conditionBS = False
     extractSVP = False
+    splitd=False
     latitude = 0
     longitude = 0
 
