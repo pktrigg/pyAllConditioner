@@ -17,15 +17,15 @@ Backscatter conditioning:
     for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
     write out the new datagram by modifying the raw bytes 
 
-implement -splitdepthmode
-    we need to store the installation records start and end, 
-    We then start spooling the datagrams into s file which will have a sensible name eg <filename>_mode.all.  
-    We then close the file each time there is a change in the depth mode within the runtime datagrams, and open a new file
 implement -splitsize
 implement -splitduration
 
 Done
 ====
+implement -splitdepthmode
+    we need to store the installation records start and end, 
+    We then start spooling the datagrams into s file which will have a sensible name eg <filename>_mode.all.  
+    We then close the file each time there is a change in the depth mode within the runtime datagrams, and open a new file
 backscatter ARC now saves the sum and count, so users can understand how reliable the resulting ARC is.
 backscatter ARC now computes a correction column so the apply option in this tool becomes useful
 SVP filename is now more ligical and imports multiple SVP's if present in .all file.
