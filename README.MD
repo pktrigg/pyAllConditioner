@@ -17,6 +17,7 @@ Backscatter conditioning:
     for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
     write out the new datagram by modifying the raw bytes 
 
+implement T_TIDE datagram so we can inject tide into a .all file.
 implement -splitsize
 implement -splitduration
 

@@ -21,7 +21,6 @@ import sortedcollection
 from operator import itemgetter
 from collections import deque
 
-
 ###############################################################################
 def main():
     parser = ArgumentParser(description='Read Kongsberg ALL file and condition the file by removing redundant records and injecting updated information to make the file self-contained.',
@@ -76,15 +75,7 @@ def main():
 
     if len(args.conditionbs) > 0:
         beamPointingAngles = []
-        if not os.path.exists(args.conditionbs):
-            print ("oops: backscatter conditioning filename does not exist, please try again: %s" % args.conditionbs)
-            exit()
-        ARCList = loadCSVFile(args.conditionbs)
-        ARCList.pop(0)
-        ARC = {}
-        for item in ARCList:
-            ARC[float(item[0])] = float(item[5])
-        print ("Conditioning Y_SeabedImage datagrams with: %s :" % args.conditionbs)
+        ARC = loadARC(args.conditionbs)        
         conditionBS = True
         args.exclude = 'Y' # we need to NOT write out the original data as we will be creating new records
 
@@ -252,7 +243,7 @@ def main():
             for beam in ARC:
                 if beam.numberOfSamplesPerBeam > 0:
                     beamARC = (beam.sampleSum/beam.numberOfSamplesPerBeam)
-                    f.write("%.3f, %.3f, %d, %d, %d, %.3f\n" % (beam.takeOffAngle, beamARC, beam.sector, beam.sampleSum, beam.numberOfSamplesPerBeam , (-1.0 * beamARC) + responseAverage))
+                    f.write("%.3f, %.3f, %d, %d, %d, %.3f\n" % (beam.takeOffAngle, beamARC, beam.sector, beam.sampleSum, beam.numberOfSamplesPerBeam , beamARC + responseAverage))
 
     update_progress("Process Complete: ", (fileCounter/len(matches)))
     if writeConditionedFile:
@@ -260,6 +251,19 @@ def main():
         outFilePtr.close()
 
 
+###############################################################################
+def loadARC(conditionbs):
+    if not os.path.exists(conditionbs):
+        print ("oops: backscatter conditioning filename does not exist, please try again: %s" % conditionbs)
+        exit()
+    ARCList = loadCSVFile(conditionbs)
+    ARCList.pop(0)
+    ARC = {}
+    for item in ARCList:
+        ARC[float(item[0])] = float(item[5])
+    print ("Conditioning Y_SeabedImage datagrams with: %s :" % args.conditionbs)
+    return ARC
+        
 ###############################################################################
 def extractProfile(datagram, TypeOfDatagram, currentRecordDateTime, latitude, longitude, filename, odir):
     '''extract the SVP profile and save it to a file for use with CARIS'''
@@ -422,14 +426,11 @@ class SRHReader:
         return
 
     def loadfile(self, filename):
-
         if not os.path.isfile(filename):
             print ("SRH file not found:", filename)
             return
         fileptr = open(filename, 'rb')        
         fileSize = os.path.getsize(filename)
-        # self.sc = sortedcollection.SortedCollection(key=itemgetter(0))
-        # numberRecords = int(fileSize / self.SRHPacket_len)
         print (filename)
         try:
             while True:

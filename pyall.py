@@ -7,6 +7,7 @@
 
 # See readme.md for more details
 
+import ctypes
 import math
 import pprint
 import struct
@@ -14,9 +15,6 @@ import os.path
 import time
 from datetime import datetime
 from datetime import timedelta
-# from datetime import timezone
-# import geodetic
-# import zlib
 
 def main():
     #open the ALL file for reading by creating a new ALLReader class and passin in the filename to open.
@@ -42,7 +40,10 @@ def main():
         typeOfDatagram, datagram = r.readDatagram()
         print(typeOfDatagram, end='')
         
-        # print(r.currentRecordDateTime())
+        rawbytes = r.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
+        crc = crc16(rawbytes[4:-2])
+        # 51155
+        # # print(r.currentRecordDateTime())
 
         if typeOfDatagram == '3':
             datagram.read()
@@ -1373,11 +1374,6 @@ class Y_SEABEDIMAGE:
             correction = self.ARC[a]
             for sample in b.samples:
                 s.append(int(sample + correction))
-        # now add the ARC correction based on the take off angles 
-        # s = list(self.samples)
-        # for i in range(len(s)):
-        #     s[i] = 0            
-        # pack the actual seabed imagery
         sampleRecord = struct.pack(sample_fmt, *s)
         fullDatagram = fullDatagram + sampleRecord
 
@@ -1390,10 +1386,9 @@ class Y_SEABEDIMAGE:
 
         return fullDatagram
 
-
-#######################
+###############################################################################
 # TIME HELPER FUNCTIONS
-#######################
+###############################################################################
 def to_timestamp(dateObject):
     return (dateObject - datetime(1970, 1, 1)).total_seconds()
 
@@ -1409,7 +1404,9 @@ def dateToKongsbergTime(dateObject):
 def dateToSecondsSinceMidnight(dateObject):
     return (dateObject - dateObject.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
 
- 
+############################################################################### 
+# bitwise helper functions
+############################################################################### 
 def isBitSet(int_type, offset):
     '''testBit() returns a nonzero result, 2**offset, if the bit at 'offset' is one.'''
     mask = 1 << offset
@@ -1418,139 +1415,60 @@ def isBitSet(int_type, offset):
 def swap16(i):
     return struct.unpack("<H", struct.pack(">H", i))[0]
 
-###############################################################################
-def crc16(data, bits=8):
-    crc = 0xFFFF
-    for op, code in zip(data[0::2], data[1::2]):
-        crc = crc ^ int(op+code, 16)
-        for bit in range(0, bits):
-            if (crc&0x0001)  == 0x0001:
-                crc = ((crc >> 1) ^ 0xA001)
-            else:
-                crc = crc >> 1
-    return typecasting(crc)
-
 def typecasting(crc):
     msb = hex(crc >> 8)
     lsb = hex(crc & 0x00FF)
     return lsb + msb
 
+def crc16(data: bytes):
+    '''
+    CRC-16-CCITT Algorithm
+    '''
+    data = bytearray(data)
+    poly = 0x8408
+    crc = 0xFFFF
+    for b in data:
+        cur_byte = b & 0xFF
+        for _ in range(0, 8):
+            if (crc & 0x0001) ^ (cur_byte & 0x0001):
+                crc = (crc >> 1) ^ poly
+            else:
+                crc >>= 1
 
-# # -*- coding: utf8 -*-
+            cur_byte >>= 1
+    crc = ~crc
+    crc = (crc << 8) | ((crc >> 8) & 0xFF)
+    return ctypes.c_ushort(crc).value
 
-
-# # CRC32 MODULE
-
-
-# from ctypes import c_ulong
-
-
-# ###############################################################################
-# class CRC32(object):
-#     crc32_tab = []
-
-#     # The CRC's are computed using polynomials. Here is the most used
-#     # coefficient for CRC32
-#     crc32_constant = 0xEDB88320
-
-#     def __init__(self):
-#         # initialize the precalculated tables
-#         if not len(self.crc32_tab):
-#             self.init_crc32()
-
-#     def calculate(self, input_data=None):
-#         try:
-#             is_string = isinstance(input_data, str)
-#             is_bytes = isinstance(input_data, (bytes, bytearray))
-
-#             if not is_string and not is_bytes:
-#                 raise Exception("Please provide a string or a byte sequence as \
-#                     argument for calculation.")
-
-#             crc_value = 0xffffffff
-
-#             for c in input_data:
-#                 d = ord(c) if is_string else c
-#                 tmp = crc_value ^ d
-#                 crc_value = (crc_value >> 8) ^ self.crc32_tab[(tmp & 0x00ff)]
-
-#             # Only for CRC-32: When all bytes have been processed, take the
-#             # one's complement of the obtained CRC value
-#             crc_value ^= 0xffffffff  # (or crcValue = ~crcValue)
-
-#             return crc_value
-#         except Exception as e:
-#             print("EXCEPTION(calculate): {}".format(e))
-
-#     def init_crc32(self):
-#         """The algorithm use tables with precalculated values"""
-#         for i in range(0, 256):
-#             crc = i
-#             for j in range(0, 8):
-#                 if crc & 0x00000001:
-#                     crc = int(c_ulong(crc >> 1).value) ^ self.crc32_constant
-#                 else:
-#                     crc = int(c_ulong(crc >> 1).value)
-
-#             self.crc32_tab.append(crc)
-
-# # -*- coding: utf8 -*-
-
-
-# # CRC16 MODULE
-
-# # includes CRC16 and CRC16 MODBUS
-
-
-from ctypes import c_ushort
-class CRC16(object):
-    crc16_tab = []
-
-    # The CRC's are computed using polynomials. Here is the most used
-    # coefficient for CRC16
-    crc16_constant = 0xA001  # 40961
-
-    def __init__(self, modbus_flag=False):
-        # initialize the precalculated tables
-        if not len(self.crc16_tab):
-            self.init_crc16()
-        self.mdflag = bool(modbus_flag)
-
-    def calculate(self, input_data=None):
-        try:
-            is_string = isinstance(input_data, str)
-            is_bytes = isinstance(input_data, (bytes, bytearray))
-
-            if not is_string and not is_bytes:
-                raise Exception("Please provide a string or a byte sequence "
-                                "as argument for calculation.")
-
-            crc_value = 0x0000 if not self.mdflag else 0xffff
-
-            for c in input_data:
-                d = ord(c) if is_string else c
-                tmp = crc_value ^ d
-                rotated = crc_value >> 8
-                crc_value = rotated ^ self.crc16_tab[(tmp & 0x00ff)]
-
-            return crc_value
-        except Exception as e:
-            print("EXCEPTION(calculate): {}".format(e))
-
-    def init_crc16(self):
-        """The algorithm uses tables with precalculated values"""
-        for i in range(0, 256):
-            crc = c_ushort(i).value
-            for j in range(0, 8):
-                if crc & 0x0001:
-                    crc = c_ushort(crc >> 1).value ^ self.crc16_constant
-                else:
-                    crc = c_ushort(crc >> 1).value
-            self.crc16_tab.append(crc)
-
-# # def do_crc(s):
-# #     n = zlib.crc32(s)
-# #     return n & 0xffffffff
+# #define POLY 0x8408
+# unsigned short blkcrc(unsigned char *bufptr, /* message buffer */ unsigned long len /* number of bytes */ )
+# {
+# unsigned char i;
+# unsigned short data;
+# unsigned short crc = 0xffff;
+# if (len == 0L) 
+# {
+#   return ~crc;
+# }
+# do 
+# {
+#   for (i=0, data = (unsigned short) (0xff & *bufptr++); i < 8; i++, data >>= 1) 
+#   {
+#       if ((crc & 0x0001) ^ (data & 0x0001)) 
+#       {
+#           crc = (crc >> 1) ^ POLY;
+#       } 
+#       else 
+#       {
+#           crc >>= 1;
+#       }
+#   }
+# } while (--len);
+# crc = ~crc;
+# data = crc;
+# crc = (crc << 8) | ((data >> 8) & 0xff);
+# return crc;
+# }
 
 if __name__ == "__main__":
         main()
