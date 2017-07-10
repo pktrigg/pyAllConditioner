@@ -83,6 +83,14 @@ etc
 The date and position will be extracted from the .all file, which makes this very easy to manage in CARIS
 ```
 
+To SPLIT FILE WHEN DEPTH MODES CHANGES, 
+```
+python pyallconditioner.py -i <filename.all> -splitd
+
+This tool read teh R_RUNTIME records and each time the depth mode changes, it closes the conditioned file, thereby splitting based on depoth mode.  for convenicnce, the file name is appended with the depth mode.  This is very useful for analysing the backscatter as we can analyse each mode independently.
+```
+
+
 To EXTRACT ANGULAR RESPONSE CURVES from the 'Y' seabed image datagrams, 
 ```
 python pyallconditioner.py -i <filename.all> -extractbs
