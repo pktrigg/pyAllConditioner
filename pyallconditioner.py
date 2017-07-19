@@ -299,12 +299,13 @@ def extractBSCorrData(datagram, TypeOfDatagram, filename, odir):
     '''extract the BSCorr file from the Extraparameter datagram and save it to a file.  good for backscatter calibration'''
     if TypeOfDatagram == '3':
         datagram.read()
-        outfile = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_BSCorr.txt")
-        outfile = createOutputFileName(outfile)
-        print("Writing SVP Profile : %s" % outfile)
-        with open(outfile, 'w') as f:
-            f.write(str(datagram.data).replace("\\n", "\n"))
-            f.close()
+        if datagram.ContentIdentifier == 6:
+            outfile = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_BSCorr.txt")
+            outfile = createOutputFileName(outfile)
+            print("Writing SVP Profile : %s" % outfile)
+            with open(outfile, 'w') as f:
+                f.write(str(datagram.data).replace("\\n", "\n"))
+                f.close()
     return
 
 ###############################################################################
