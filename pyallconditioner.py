@@ -303,8 +303,10 @@ def extractBSCorrData(datagram, TypeOfDatagram, filename, odir):
             outfile = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_BSCorr.txt")
             outfile = createOutputFileName(outfile)
             print("Writing SVP Profile : %s" % outfile)
+            data = str(datagram.data).replace("\\n", "\n")
+            data = data.replace("\\t", "\t")
             with open(outfile, 'w') as f:
-                f.write(str(datagram.data).replace("\\n", "\n"))
+                f.write(data)
                 f.close()
     return
 
