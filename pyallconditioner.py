@@ -33,6 +33,7 @@ def main():
     parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='Extract backscatter from Y datagram so we can analyse. [Default: False]')
     parser.add_argument('-r', action='store_true', default=False, dest='recursive', help='Search Recursively from the current folder.  [Default: False]')
     parser.add_argument('-svp', action='store_true', default=False, dest='svp', help='Output a CARIS compatible SVP file based on the sound velocity datagram.  [Default: False]')
+    parser.add_argument('-bscorr', action='store_true', default=False, dest='bscorr', help='Output the backscatter bscorr.txt file as used in the PU.  This is useful for backscatter calibration and processing, and removes the need to telnet into the PU.   [Default: False]')
     parser.add_argument('-splitd', action='store_true', default=False, dest='splitd', help='split the .all file every time the depth mode changes.  [Default: False]')
 
     if len(sys.argv)==1:
@@ -49,6 +50,7 @@ def main():
     writeConditionedFile = True
     conditionBS = False
     extractSVP = False
+    extractBSCorr = False
     splitd=False
     latitude = 0
     longitude = 0
@@ -103,6 +105,10 @@ def main():
         # auto exclude attitude records.  on reflection, we should probably NOT do this.
         # args.exclude = 'n'
 
+    if args.bscorr:
+        extractBSCorr=True
+        writeConditionedFile= False #we do not need to write out a .all file
+
     if args.svp:
         extractSVP=True
         writeConditionedFile= False #we do not need to write out a .all file
@@ -124,12 +130,6 @@ def main():
 
         if splitd:
             InstallStart, InstallEnd, initialDepthMode = r.loadInstallationRecords()
-
-        if extractSVP:
-            # we need the position of the SVP dip in the SVP file, so use the first position record in the file.
-            nav = r.loadNavigation(True)
-            latitude = nav[0][1]
-            longitude = nav[0][2]
 
         if inject:                    
             TypeOfDatagram, datagram = r.readDatagram()
@@ -211,6 +211,9 @@ def main():
 
             if extractSVP:
                 extractProfile(datagram, TypeOfDatagram, r.currentRecordDateTime(), latitude, longitude, filename, args.odir)
+
+            if extractBSCorr:
+                extractBSCorrData(datagram, TypeOfDatagram, filename, args.odir)
         
 
             # the user has opted to skip this datagram, so continue
@@ -275,12 +278,12 @@ def extractProfile(datagram, TypeOfDatagram, currentRecordDateTime, latitude, lo
 
     if TypeOfDatagram == 'U':
         datagram.read()
-        outSVP = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_SVP.svp")
-        outSVP = createOutputFileName(outSVP)
-        print("Writing SVP Profile : %s" % outSVP)
-        with open(outSVP, 'w') as f:
+        outfile = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_SVP.svp")
+        outfile = createOutputFileName(outfile)
+        print("Writing SVP Profile : %s" % outfile)
+        with open(outfile, 'w') as f:
             f.write("[SVP_Version_2]\n")
-            f.write("%s\n" % outSVP)
+            f.write("%s\n" % outfile)
             
             day_of_year = (currentRecordDateTime - datetime(currentRecordDateTime.year, 1, 1)).days
             lat = decdeg2dms(latitude)
@@ -288,6 +291,19 @@ def extractProfile(datagram, TypeOfDatagram, currentRecordDateTime, latitude, lo
             f.write("Section %s-%s %s:%s:%s %s:%s:%.3f %s:%s:%.3f\n" % (currentRecordDateTime.year, day_of_year, currentRecordDateTime.hour, currentRecordDateTime.minute, currentRecordDateTime.second, int(lat[0]), int(lat[1]), lat[2], int(lon[0]), int(lon[1]), lon[2] ))
             for row in datagram.data:
                 f.write("%.3f %.3f \n" % (row[0], row[1]))
+            f.close()
+    return
+
+###############################################################################
+def extractBSCorrData(datagram, TypeOfDatagram, filename, odir):
+    '''extract the BSCorr file from the Extraparameter datagram and save it to a file.  good for backscatter calibration'''
+    if TypeOfDatagram == '3':
+        datagram.read()
+        outfile = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_BSCorr.txt")
+        outfile = createOutputFileName(outfile)
+        print("Writing SVP Profile : %s" % outfile)
+        with open(outfile, 'w') as f:
+            f.write(str(datagram.data).replace("\\n", "\n"))
             f.close()
     return
 
