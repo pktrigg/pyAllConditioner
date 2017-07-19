@@ -23,6 +23,7 @@ implement -splitduration
 
 Done
 ====
+added support for '-bscorr' to export the 3_EXTRA_PARAMETERS datagram into a bscorr file (if present)
 implement -splitdepthmode
     we need to store the installation records start and end, 
     We then start spooling the datagrams into s file which will have a sensible name eg <filename>_mode.all.  
