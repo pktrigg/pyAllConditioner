@@ -138,6 +138,13 @@ def main():
             SRHSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset)
             r.rewind()
 
+        if extractSVP:
+            # we need the position of teh SVP dip in the SVP file, so use thge first position record in the file
+            nav = r.loadNavigation(True)
+            if len(nav) > 0:
+                latitude = nav[0][1]
+                longitude = nav[0][2]
+
         while r.moreData():
             # read a datagram.  If we support it, return the datagram type and aclass for that datagram
             TypeOfDatagram, datagram = r.readDatagram()
@@ -302,7 +309,7 @@ def extractBSCorrData(datagram, TypeOfDatagram, filename, odir):
         if datagram.ContentIdentifier == 6:
             outfile = os.path.join(os.path.dirname(os.path.abspath(filename)), os.path.splitext(filename)[0] + "_BSCorr.txt")
             outfile = createOutputFileName(outfile)
-            print("Writing SVP Profile : %s" % outfile)
+            print("Writing BSCorr file : %s" % outfile)
             data = str(datagram.data).replace("\\n", "\n")
             data = data.replace("\\t", "\t")
             with open(outfile, 'w') as f:
