@@ -3,6 +3,7 @@
 #by:            p.kennedy@fugro.com
 #description:   python module to pre-process a Kongsberg ALL sonar file and do useful hings with it
 #               See readme.md for more details
+# more changes
 
 import csv
 import sys
