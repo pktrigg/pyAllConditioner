@@ -10,18 +10,19 @@ pyAllConditioner
 
 2DO
 ===
-Backscatter conditioning:
-    load a corrections file into memory which contains a list of sectornumber, correction(dB) values
-    read the raw rang datagram and create a mean to sector lookup
-    read the seabedimage datagram
-    for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
-    write out the new datagram by modifying the raw bytes 
 
 implement T_TIDE datagram so we can inject tide into a .all file.
 implement -splitsize
 implement -splitduration
 
 Done
+trap overflows in backscatter samples due to short integer
+Backscatter conditioning:
+    load a corrections file into memory which contains a list of sectornumber, correction(dB) values
+    read the raw rang datagram and create a mean to sector lookup
+    read the seabedimage datagram
+    for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
+    write out the new datagram by modifying the raw bytes 
 ====
 added support for '-bscorr' to export the 3_EXTRA_PARAMETERS datagram into a bscorr file (if present)
 implement -splitdepthmode
