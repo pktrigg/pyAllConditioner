@@ -14,7 +14,7 @@
                 "RedirectOutput"
             ],
             
-            "args": ["-odir", "conditioned", "-i", "C:/development/python/EM302/1501_20140905_174928_Fugro_Equator_GA4421.all", "-svp"]
+            "args": ["-odir", "conditioned", "-i", "C:/development/python/sample.all", "-splitt", "60"]
         }
    ]
 }
