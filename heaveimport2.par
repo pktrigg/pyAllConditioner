@@ -1,0 +1,31 @@
+Generic Parser Definition
+3
+Header
+0
+FileDate
+IDENT_YES
+Name
+2
+1 4
+5 2
+7 2
+TimeStamp
+FREEFORM
+1
+YEAR_YES
+1 4
+5 2
+7 2
+HOUR_NO
+MIN_NO
+9 9 1.000000 0.000000
+DelayedHeave
+IDENT_NO
+FREEFORM
+1
+1.000000 0.000000
+SoundVelocity
+IDENT_NO
+LINENUMBER_NO
+DEFAULT
+1500.000000

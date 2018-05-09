@@ -7,17 +7,19 @@
             "request": "launch",
             "stopOnEntry": false,
             "program": "${file}",
-            "pythonPath": "c:/python34/python.exe",
+            "pythonPath": "python.exe",
             "debugOptions": [
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            
-            "args": ["-odir", "conditioned", "-i", "C:/development/python/sample.all", "-splitt", "60"]
+			"args": ["-odir", "conditioned", "-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/Reelax_Dual/2016-311/0570_20161106_214852_AIMS_Reelax/simradfile.all", "-nadir"]
+			
         }
-   ]
+	]
 }
+"args": ["-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/delayedheave/0571simradFile.txt"]
+"args": ["-odir", "conditioned", "-i", "C:/development/python/sample.all", "-attitude"]
             "args": ["-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710_Original.all", "-splitd"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all", "-conditionbs", "c:/projects/carisworldtour/preprocess/conditioned/angularResponseCurve.csv"]
