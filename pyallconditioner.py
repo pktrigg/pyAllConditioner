@@ -30,7 +30,7 @@ def main():
 			epilog='Example: \n To condition a single file use -i c:/temp/myfile.all \n to condition all files in a folder use -i c:/temp/*.all\n To condition all .all files recursively in a folder, use -r -i c:/temp \n To condition all .all files recursively from the current folder, use -r -i ./ \n', formatter_class=RawTextHelpFormatter)
 	parser.add_argument('-i', dest='inputFile', action='store', help='Input ALL filename to image. It can also be a wildcard, e.g. *.all')
 	parser.add_argument('-exclude', dest='exclude', action='store', default="", help='Exclude these datagrams.  Note: this needs to be case sensitive e.g. -x YNn')
-	parser.add_argument('-srh', dest='SRHInjectFileName', action='store', default="", help='Inject this attitude file as A datagrams. e.g. -srh "*.srh" (Hint: remember the quotes!)')
+	parser.add_argument('-injectA', dest='injectFileName', action='store', default="", help='Inject this attitude file as A datagrams. e.g. -srh "*.srh" (Hint: remember the quotes!)')
 	parser.add_argument('-conditionbs', dest='conditionbs', action='store', default="", help='Improve the Y_SeabedImage datagrams by adding a CSV correction file. eg. -conditionbs c:/angularResponse.csv')
 	parser.add_argument('-odir', dest='odir', action='store', default="", help='Specify a relative output folder e.g. -odir conditioned')
 	parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='Extract backscatter from Y datagram so we can analyse. [Default: False]')
@@ -51,7 +51,7 @@ def main():
 
 	fileCounter=0
 	matches = []
-	inject = False
+	injectAttitude = False
 	extractAttitude=False
 	extractNadir=False
 	extractBackscatter = False
@@ -111,13 +111,18 @@ def main():
 		outFileName = createOutputFileName(outFileName)
 
 	# the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
-	if len(args.SRHInjectFileName) > 0:
-		inject = True
-		print ("SRH Injector will strip 'n' attitude records while injecting %s" % args.SRHInjectFileName)
-		print ("SRH Injector will inject system 2 'A' records as an inactive attitude data sensor with empty pitch,roll and heading datap")
-		SRH = SRHReader()
-		SRH.loadFiles(args.SRHInjectFileName) # load all the filenames
-		print ("Records to inject: %d" % len(SRH.SRHData))
+	if len(args.injectFileName) > 0:
+		injectAttitude = True
+		print ("Injector will strip 'n' attitude records while injecting %s" % args.injectFileName)
+		print ("Injector will inject system 1 'A' records as an active attitude data sensor with pitch,roll,heave and heading data. You may well need to also use the -exclude A to remove the existing records so the .all file is not conflicted")
+		if args.injectFileName.lower().endswith('.srh'):
+			SRH = SRHReader()
+			SRH.loadFiles(args.injectFileName) # load all the filenames
+			print ("Records to inject: %d" % len(SRH.SRHData))
+		if args.injectFileName.lower().endswith('.txt'):
+			ATT = ATTReader()
+			ATT.loadFiles(args.injectFileName)
+			print ("Records to inject: %d" % len(ATT.ATTData))
 		# auto exclude attitude records.  on reflection, we should probably NOT do this.
 		# args.exclude = 'n'
 
@@ -175,7 +180,7 @@ def main():
 		counter = 0
 
 		if extractNadir:
-			print ("NadirDepth,TxDepth, Pitch,Heave,Roll ")
+			print ("NadirDepth,TxDepth,Roll,Pitch,Heave,Heading ")
 		
 		if extractAttitude:
 			# read the first record so we get a date for the file header
@@ -188,12 +193,18 @@ def main():
 		if splitt > 0:
 			InstallStart, InstallEnd, initialDepthMode = r.loadInstallationRecords()
 
-		if inject:					
+		if injectAttitude:					
 			TypeOfDatagram, datagram = r.readDatagram()
-			# kill off the leading records so we do not swamp the filewith unwanted records
-			SRHSubset = deque(SRH.SRHData)
-			SRHSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset)
-			r.rewind()
+			if args.injectFileName.lower().endswith('.srh'):
+				# kill off the leading records so we do not swamp the filewith unwanted records
+				SRHSubset = deque(SRH.SRHData)
+				SRHSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset)
+				r.rewind()
+			if args.injectFileName.lower().endswith('.txt'):
+				# kill off the leading records so we do not swamp the filewith unwanted records
+				ATTSubset = deque(ATT.ATTData)
+				ATTSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), ATTSubset)
+				r.rewind()
 
 		if extractSVP:
 			# we need the position of the SVP dip in the SVP file, so use the first position record in the file
@@ -205,6 +216,7 @@ def main():
 		currPitch = 0
 		currRoll = 0
 		currHeave = 0
+		currHeading = 0
 
 		while r.moreData():
 			# read a datagram.  If we support it, return the datagram type and aclass for that datagram
@@ -222,23 +234,22 @@ def main():
 					# find the depth nearest to Nadir
 					# https://stackoverflow.com/questions/9706041/finding-index-of-an-item-closest-to-the-value-in-a-list-thats-not-entirely-sort
 					nadirBeam = min(range(len(datagram.AcrossTrackDistance)), key=lambda i: abs(datagram.AcrossTrackDistance[i]))
-					print ("%.3f,%.3f,%.3f,%.3f,%.3f" % (datagram.Depth[nadirBeam], datagram.TransducerDepth/100, currRoll, currPitch, currHeave))
+					print ("%.3f,%.3f,%.3f,%.3f,%.3f" % (datagram.Depth[nadirBeam], datagram.TransducerDepth/100, currRoll, currPitch, currHeave, currHeading))
 				if TypeOfDatagram == 'A':
 					datagram.read()
 					currRoll = datagram.Attitude[-1][3]
 					currPitch = datagram.Attitude[-1][4]
 					currHeave = datagram.Attitude[-1][5]
+					currHeading = datagram.Attitude[-1][6]
+
 			if extractAttitude:
 				if TypeOfDatagram == 'A':
 					datagram.read()
 					for a in datagram.Attitude:
 						dateobject = pyall.to_DateTime(a[0], a[1])
-						str = ("%d,%.3f,%.3f,%.3f,%.3f\n" % (a[0],a[1],a[3],a[4],a[5]))
+						# date, time, roll, pitch, heave, heading
+						str = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (a[0],a[1],a[3],a[4],a[5],a[6]))
 						outFilePtr.write(str)
-						# outFilePtr.write("%s,%.3f" % (pyall.to_timestamp(dateobject), a[5]))
-					currRoll = datagram.Attitude[len(datagram.Attitude)[3]]
-					currPitch = datagram.Attitude[len(datagram.Attitude)[4]]
-					currHeave = datagram.Attitude[len(datagram.Attitude)[5]]
 			if install:
 				if TypeOfDatagram == 'I':
 					datagram.read()
@@ -283,11 +294,14 @@ def main():
 						initialDepthMode = datagram.DepthMode #remember the new depth mode!
 						
 			# before we write the datagram out, we need to inject records with a smaller from_timestamp
-			if inject:					
+			if injectAttitude:					
 				if TypeOfDatagram in args.exclude:
 					# dont trigger on records we are rejecting!		
 					continue
-				counter = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
+				if args.injectFileName.lower().endswith('.srh'):
+					counter = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
+				if args.injectFileName.lower().endswith('.txt'):
+					counter = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), ATTSubset, counter)
 
 				# this is a testbed until we figure out how caris handles the application of heave.
 				# if TypeOfDatagram == 'X':
@@ -587,13 +601,13 @@ def injector(outFilePtr, currentRecordTimeStamp, injectionData, counter):
 		datagram = a.encode(recordsToAdd, counter)
 		outFilePtr.write(datagram)
 
-		# encode and inject a H_HEIGHT record containing Heave so CARIS can apply it in processing without the need to re-refract from range/bearing
-		date = pyall.from_timestamp(recordsToAdd[0][0])
-		recordDate = pyall.dateToKongsbergDate(date)
-		recordTime = pyall.dateToKongsbergTime(date)
-		h = pyall.H_HEIGHT_ENCODER()
-		datagram = h.encode(recordsToAdd[0][1], recordDate, recordTime, counter)
-		outFilePtr.write(datagram)
+		# # encode and inject a H_HEIGHT record containing Heave so CARIS can apply it in processing without the need to re-refract from range/bearing
+		# date = pyall.from_timestamp(recordsToAdd[0][0])
+		# recordDate = pyall.dateToKongsbergDate(date)
+		# recordTime = pyall.dateToKongsbergTime(date)
+		# h = pyall.H_HEIGHT_ENCODER()
+		# datagram = h.encode(recordsToAdd[0][1], recordDate, recordTime, counter)
+		# outFilePtr.write(datagram)
 		counter = counter + 1
 	return counter
 
@@ -674,6 +688,66 @@ def createOutputFileName(path, ext=""):
 
 
 ###############################################################################
+class ATTReader:
+	'''class to read a Guardian Attitude file'''
+	'''This class may need to read multiple txt files, merge them, sort and provide rapid access using the bisect tools in python'''
+	def __init__(self):
+		# self.SRHPacket_fmt = '>HBBLHhBH'  #pfreeheave is big endian format
+		# self.SRHPacket_len = struct.calcsize(self.SRHPacket_fmt)
+		# self.SRHPacket_unpack = struct.Struct(self.SRHPacket_fmt).unpack_from
+		self.ATTData = deque()
+
+	def loadFiles(self, filename):
+		matches = []
+		if os.path.exists(filename):
+			matches.append (os.path.abspath(filename))
+		else:
+			for f in sorted(glob(filename)):
+				matches.append(f)
+		print (matches)
+
+		if len(matches) == 0:
+			print ("Nothing found in %s to condition, quitting" % filename)
+			exit()
+		print ("Loading Attitude Files:")
+		for f in matches:
+			self.loadfile(f)
+		return
+
+	def loadfile(self, filename):
+		if not os.path.isfile(filename):
+			print ("Attitude file not found:", filename)
+			return
+		print (filename)
+		with open(filename, 'r') as csvfile:
+				reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+				header = next(reader) 
+				for row in reader:
+					# convert the caris generic data parser format into a regular timestamp
+					d = pyall.to_DateTime(row[0], float(row[1]))
+					timestamp = pyall.to_timestamp(d)
+
+					roll    = float(row[2])
+					pitch   = float(row[3])
+					heave   = float(row[4])
+					heading = float(row[5])
+					self.ATTData.append([timestamp, roll, pitch, heave, heading])
+
+		# fileptr = open(filename, 'r')		
+		# fileSize = os.path.getsize(filename)
+		# try:
+		# 	while True:
+		# 		data = fileptr.read(self.SRHPacket_len)
+		# 		if not data: break
+		# 		s = self.SRHPacket_unpack(data)
+		# 		timestamp = float(s[3]) + (s[4] * 0.0001)
+		# 		heave = float(s[5]) * 0.01
+		# 		self.SRHData.append([timestamp, heave])
+		# 		# print (from_timestamp(timestamp), heave)
+		# except struct.error:
+		# 	print ("Exception loading Attitude file.  Will process as much as can be read")
+
+###############################################################################
 class SRHReader:
 	'''class to read a Kongsberg SRH PFreeHeave file'''
 	'''This class may need to read multiple SRH files, merge them, sort and provide rapid access using the bisect tools in python'''
@@ -707,14 +781,17 @@ class SRHReader:
 		fileptr = open(filename, 'rb')		
 		fileSize = os.path.getsize(filename)
 		print (filename)
+		roll=0.0
+		pitch=0.0
+		heading=0.0
 		try:
 			while True:
 				data = fileptr.read(self.SRHPacket_len)
 				if not data: break
 				s = self.SRHPacket_unpack(data)
 				timestamp = float(s[3]) + (s[4] * 0.0001)
-				heave = float(s[5]) * 0.01
-				self.SRHData.append([timestamp, heave])
+				heave = float(s[5]) * 0.01 #heave in metres
+				self.SRHData.append([timestamp, pitch, roll, heave, heading]) #for consistency send all attitude values even if they are empty
 				# print (from_timestamp(timestamp), heave)
 		except struct.error:
 			print ("Exception loading SRH file.  Will process as much as can be read")

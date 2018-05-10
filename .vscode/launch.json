@@ -13,7 +13,7 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-			"args": ["-odir", "conditioned", "-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/Reelax_Dual/2016-311/0570_20161106_214852_AIMS_Reelax/simradfile.all", "-nadir"]
+			"args": ["-odir", "injected", "-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/0569simradFile.all", "-injectA", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/delayedheave/corrected/0569simradFile.txt", "-exclude", "A"]
 			
         }
 	]

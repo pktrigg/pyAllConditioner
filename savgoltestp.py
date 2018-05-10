@@ -47,6 +47,7 @@ def main():
 		roll = []
 		pitch = []
 		rawHeave = []
+		heading = []
 		with open(filename, 'r') as csvfile:
 				reader = csv.reader(csvfile, delimiter=',', quotechar='|')
 				header = next(reader) 
@@ -56,6 +57,7 @@ def main():
 					roll.append(float(row[2]))
 					pitch.append(float(row[3]))
 					rawHeave.append(float(row[4]))
+					heading.append(float(row[5]))
 
 		smoothed = signal.savgol_filter(rawHeave, 101, 1) 
 		for i in range(level):
@@ -69,14 +71,14 @@ def main():
 			file.write("\n")
 			for j in range(0, len(d)):
 				# save the corrected data back to a CSV file in the same format as it was read.
-				line = ("%d,%.3f,%.3f,%.3f,%.3f\n" % (d[j], t[j], roll[j], pitch[j], diff[j]))
+				line = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (d[j], t[j], roll[j], pitch[j], diff[j], heading[j]))
 				file.write(line)
 
 		plt.figure(figsize=(12,4))
 		plt.axhline(0, color='black', linewidth=0.3)
 		plt.grid(linestyle='-', linewidth='0.2', color='black')
 
-		raw = plt.plot(roll, color='red', linewidth=0.2, label='Raw Heave')
+		raw = plt.plot(rawHeave, color='red', linewidth=0.2, label='Raw Heave')
 		error = plt.plot(smoothed, color='black', linewidth=0.2, label='Heave Error')
 		corr = plt.plot(diff, color='blue', linewidth=0.2, label='Corrected Heave')
 

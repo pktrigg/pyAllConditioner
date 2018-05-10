@@ -426,7 +426,7 @@ class A_ATTITUDE_ENCODER:
 
 		fullDatagramByteCount = header_len + (rec_len*len(recordsToAdd)) + footer_len
 
-		firstRecordTimestamp = float(recordsToAdd[0][0]) #we need to know the first reord timestamp as all observations are milliseconds from that time
+		firstRecordTimestamp = float(recordsToAdd[0][0]) #we need to know the first record timestamp as all observations are milliseconds from that time
 		firstRecordDate = from_timestamp(firstRecordTimestamp)
 
 		recordDate = int(dateToKongsbergDate(firstRecordDate))
@@ -439,15 +439,21 @@ class A_ATTITUDE_ENCODER:
 		for record in recordsToAdd:
 			timeMillisecs = round((float(record[0]) - firstRecordTimestamp) * 1000) # compute the millisecond offset of the record from the first record in the datagram
 			sensorStatus = 0
-			roll	= 0.0 #float(record[1])
-			pitch   = 0.0 #float(record[2])
-			heave   = float(record[1]) * 10 # heave in m.  multiple by 10 for testing only !! pkpk
-			heading = 0.0 # float(record[4])
+			roll	= float(record[1])
+			pitch   = float(record[2])
+			heave   = float(record[3])
+			heading = float(record[4])
 			bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
 			fullDatagram = fullDatagram + bodyRecord
 
 		# now do the footer 
-		systemDescriptor = 30
+		systemDescriptor = 0
+		systemDescriptor = set_bit(systemDescriptor, 0) #set heading is ENABLED (go figure!)
+		# systemDescriptor = set_bit(systemDescriptor, 1) #set roll is DISABLED
+		# systemDescriptor = set_bit(systemDescriptor, 2) #set pitch is DISABLED
+		# systemDescriptor = set_bit(systemDescriptor, 3) #set heave is DISABLED
+		# systemDescriptor = set_bit(systemDescriptor, 4) #set SENSOR as system 2
+		# systemDescriptor = 30
 		ETX = 3
 		checksum = 0
 		footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
@@ -1039,7 +1045,8 @@ class R_RUNTIME:
 		self.maximumPortWidth	   = s[25]
 		self.beamSpacing			= s[26]
 		self.maximumPortCoverageDegrees	 = s[27]
-		self.yawAndPitchStabilisationMode   = s[28]
+		self.yawMode   = s[28]
+		# self.yawAndPitchStabilisationMode   = s[28]
 		self.maximumStbdCoverageDegrees	 = s[29]
 		self.maximumStbdWidth			   = s[30]
 		self.transmitAAlongTilt			 = s[31]
@@ -1438,6 +1445,9 @@ def isBitSet(int_type, offset):
 	'''testBit() returns a nonzero result, 2**offset, if the bit at 'offset' is one.'''
 	mask = 1 << offset
 	return (int_type & (1 << offset)) != 0
+
+def set_bit(value, bit):
+    return value | (1<<bit)
 
 def swap16(i):
 	return struct.unpack("<H", struct.pack(">H", i))[0]
