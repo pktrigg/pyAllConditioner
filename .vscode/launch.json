@@ -8,18 +8,15 @@
             "stopOnEntry": false,
             "program": "${file}",
             "pythonPath": "python.exe",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ],
-			"args": ["-odir", "injected", "-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/0569simradFile.all", "-injectA", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/delayedheave/corrected/0569simradFile.txt", "-exclude", "A"]
-			
+			"args": ["-beamqc", "-i", "C:/projects/CARIS/GA-0362_ShoalBay_East_2/raw/0211_20170906_000453_AIMS_Capricornus.all"]
         }
 	]
 }
+"args": ["-i", "C:/projects/CARIS/AutoCleanTest1/raw/*.all", "-beamqc"]
+"args": ["-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/test/0570_20161106_214852_AIMS_Reelax_HEIGHT.txt"]
+"args": ["-i", "C:/projects/CARIS/AutoCleanTest1/raw/*.all", "-injectAH", "C:/projects/CARIS/AutoCleanTest1/raw/*PROC_1.txt", "-exclude", "hA", "-odir", "conditioned", "-odix", "_pkpk]
+// "args": ["-odir", "wobble", "-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/0569simradFile.all", "-wobble"]
 "args": ["-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/delayedheave/0571simradFile.txt"]
-"args": ["-odir", "conditioned", "-i", "C:/development/python/sample.all", "-attitude"]
             "args": ["-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710_Original.all", "-splitd"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
             "args": ["-odir", "conditioned", "-i", "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all", "-conditionbs", "c:/projects/carisworldtour/preprocess/conditioned/angularResponseCurve.csv"]

@@ -1,12 +1,12 @@
 pyAllConditioner
 =====
-* created:          November 2016
-* version           1.0
-* by:               p.kennedy@fugro.com
+* created:          May 2018
+* version           2.0
+* by:               paul.kennedy@guardiangeomatics.com
 * description:      python module to read and write a Kongsberg .ALL file making subtle modifications along the way
 * notes:            See main at end of script for example how to use this
 * based on ALL file version October 2013 
-* developed for Python version 3.4 + 2.7
+* developed for Python version 3.4
 
 2DO
 ===
@@ -16,6 +16,14 @@ implement -splitsize
 implement -splitduration
 
 Done
+====
+added decode for 'f' datagrams (EM3002 raw ranges)
+added -odix so user can add an appendage to the filename
+injectAH attitude and height now implemented.  Height records are limited to sensible rates as they are only used for tides.
+reworked extraction file format.  It is now unixtime instead of 2 strings for data and time.  Much easier to deal with!
+added -attitudeHeight to extract height datagram and interpolate it into the attitude CSV file, so we can inject later.
+added -height to extract height datagram
+
 trap overflows in backscatter samples due to short integer
 Backscatter conditioning:
     load a corrections file into memory which contains a list of sectornumber, correction(dB) values
@@ -23,8 +31,7 @@ Backscatter conditioning:
     read the seabedimage datagram
     for each beam in the seabedimage daagram, find the sector, find the correction and apply it to the seabedimage datagram
     write out the new datagram by modifying the raw bytes 
-====
-added support for '-bscorr' to export the 3_EXTRA_PARAMETERS datagram into a bscorr file (if present)
+    added support for '-bscorr' to export the 3_EXTRA_PARAMETERS datagram into a bscorr file (if present)
 implement -splitdepthmode
     we need to store the installation records start and end, 
     We then start spooling the datagrams into s file which will have a sensible name eg <filename>_mode.all.  

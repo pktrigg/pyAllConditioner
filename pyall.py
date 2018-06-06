@@ -1,6 +1,6 @@
 #name:		  pyALL
-#created:	   August 2016
-#by:			p.kennedy@fugro.com
+#created:	   May 2018
+#by:			paul.kennedy@guardiangeomatics.com
 #description:   python module to read a Kongsberg ALL sonar file
 #notes:		 See main at end of script for example how to use this
 #based on ALL Revision R October 2013
@@ -21,7 +21,8 @@ def main():
 	# filename =   "C:/Python27/ArcGIS10.3/pyall-master/0314_20170421_222154_SA1702-FE_302.all"
 	# filename =   "C:/development/Python/m3Sample.all"
 	# filename = "C:/development/python/0004_20110307_041009.all"
-	filename = "C:/development/python/sample.all"
+	filename	 = "C:/projects/CARIS/GA-0362_ShoalBay_East_2/raw/0211_20170906_000453_AIMS_Capricornus.all"
+	# filename = "C:/development/python/sample.all"
 	# filename = "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"
 	# filename = "C:/projects/RVInvestigator/0016_20160821_150810_Investigator_em710.all"
 	# filename = "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all"
@@ -65,6 +66,9 @@ def main():
 			nadirBeam = int(datagram.NBeams / 2)
 			# print (("Nadir Depth: %.3f AcrossTrack %.3f TransducerDepth %.3f Checksum %s" % (datagram.Depth[nadirBeam], datagram.AcrossTrackDistance[nadirBeam], datagram.TransducerDepth, datagram.checksum)))
 			continue
+
+		if typeOfDatagram == 'f':
+			datagram.read()
 		
 		if typeOfDatagram == 'H':
 			datagram.read()
@@ -127,7 +131,8 @@ class ALLReader:
 		self.fileSize = os.path.getsize(ALLfileName)
 		self.recordDate = ""
 		self.recordTime = ""
-
+		self.recordCounter=0
+		
 	def __str__(self):
 		return pprint.pformat(vars(self))
 
@@ -214,6 +219,7 @@ class ALLReader:
 	def readDatagram(self):
 		'''read the datagram header.  This permits us to skip datagrams we do not support'''
 		numberOfBytes, STX, typeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
+		self.recordCounter += 1
 		
 		if typeOfDatagram == '3': # 3_EXTRA PARAMETERS DECIMAL 51
 			dg = E_EXTRA(self.fileptr, numberOfBytes)
@@ -227,8 +233,11 @@ class ALLReader:
 		if typeOfDatagram == 'D': # D DEPTH
 			dg = D_DEPTH(self.fileptr, numberOfBytes)
 			return dg.typeOfDatagram, dg
-		if typeOfDatagram == 'H': # H Height  
-			dg = H_HEIGHT(self.fileptr, numberOfBytes)
+		if typeOfDatagram == 'f': # f Raw Range
+			dg = f_RAWRANGE(self.fileptr, numberOfBytes)
+			return dg.typeOfDatagram, dg
+		if typeOfDatagram == 'h': # h Height, not to be confused with H_Heading!
+			dg = h_HEIGHT(self.fileptr, numberOfBytes)
 			return dg.typeOfDatagram, dg 
 		if typeOfDatagram == 'I': # I Installation (Start)
 			dg = I_INSTALLATION(self.fileptr, numberOfBytes)
@@ -262,11 +271,9 @@ class ALLReader:
 			dg = UNKNOWN_RECORD(self.fileptr, numberOfBytes, typeOfDatagram)
 			return dg.typeOfDatagram, dg
 			# self.fileptr.seek(numberOfBytes, 1)
-
 ###############################################################################
 	def loadInstallationRecords(self):	
-		'''loads all the navigation into lists'''
-		
+		'''loads all the installation into lists'''		
 		installStart = None
 		installStop = None
 		initialMode = None
@@ -274,13 +281,11 @@ class ALLReader:
 		self.rewind()
 		while self.moreData():
 			typeOfDatagram, datagram = self.readDatagram()
-			# print (typeOfDatagram, end='')
 			if (typeOfDatagram == 'I'):
 				installStart = self.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
 				datagram.read()
 				break
 			if (typeOfDatagram == 'i'):
-				# datagram.read()
 				installStop = self.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
 			if (initialMode == None and typeOfDatagram == 'R'):
 				datagram.read()
@@ -432,7 +437,12 @@ class A_ATTITUDE_ENCODER:
 		recordDate = int(dateToKongsbergDate(firstRecordDate))
 		recordTime = int(dateToSecondsSinceMidnight(firstRecordDate)*1000)
 		# we need to deduct 4 bytes as the field does not account for the 4-byte message length data which precedes the message
-		header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, typeOfDatagram, model, recordDate, recordTime, counter, serialNumber, numEntries)
+		try:
+			header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, typeOfDatagram, model, recordDate, recordTime, counter, serialNumber, numEntries)
+		except:
+			print ("error encoding attitude")
+			# header = struct.pack(header_fmt, fullDatagramByteCount-4, STX, typeOfDatagram, model, recordDate, recordTime, counter, serialNumber, numEntries)
+			
 		fullDatagram = fullDatagram + header
 		
 		# now pack avery record from the list
@@ -443,7 +453,11 @@ class A_ATTITUDE_ENCODER:
 			pitch   = float(record[2])
 			heave   = float(record[3])
 			heading = float(record[4])
-			bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
+			try:
+				bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
+			except:
+				print ("error encoding attitude")
+				bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
 			fullDatagram = fullDatagram + bodyRecord
 
 		# now do the footer 
@@ -503,7 +517,8 @@ class A_ATTITUDE:
 		while i < self.NumberEntries:
 			data = self.fileptr.read(rec_len)
 			s = rec_unpack(data)
-			self.Attitude[i] = [self.RecordDate, self.Time + s[0]/1000, s[1], s[2]/100.0, s[3]/100.0, s[4]/100.0, s[5]/100.0]
+			# time,status,roll,pitch,heave,heading
+			self.Attitude[i] = [self.RecordDate, self.Time + float (s[0]/1000.0), s[1], s[2]/100.0, s[3]/100.0, s[4]/100.0, s[5]/100.0]
 			i = i + 1
 
 		rec_fmt = '=BBH'
@@ -539,16 +554,24 @@ class C_CLOCK:
 		self.typeOfDatagram  = chr(s[2])
 		self.EMModel		 = s[3]
 		self.RecordDate	  = s[4]
-		self.Time			= float(s[5]/1000.0)
+		self.time			= float(s[5] / 1000.0)
 		self.ClockCounter	= s[6]
 		self.SerialNumber	= s[7]
 
 		self.ExternalDate	   = s[8]
-		self.ExternalTime	   = s[9]
+		self.ExternalTime	   = s[9] / 1000.0
 		self.PPS				= s[10]
 		self.ETX				= s[11]
 		self.checksum		   = s[12]
 	
+	def __str__(self):
+		if self.PPS == 0:
+			ppsInUse = "PPS NOT in use"
+		else:
+			ppsInUse = "PPS in use"
+			
+		s = '%d,%d,%.3f,%.3f,%.3f,%s' %(self.RecordDate, self.ExternalDate, self.time, self.ExternalTime, self.time - self.ExternalTime, ppsInUse)
+		return s
 
 ###############################################################################
 class D_DEPTH:
@@ -684,7 +707,107 @@ class E_EXTRA:
 		self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
 ###############################################################################
-class H_HEIGHT:
+class f_RAWRANGE:
+	def __init__(self, fileptr, numberOfBytes):
+		self.typeOfDatagram = 'f'
+		self.offset = fileptr.tell()
+		self.numberOfBytes = numberOfBytes
+		self.fileptr = fileptr
+		self.fileptr.seek(numberOfBytes, 1)
+		self.data = ""
+
+	def read(self):
+		self.fileptr.seek(self.offset, 0)
+		rec_fmt = '=LBBHLLHH HHLl4H'
+		rec_len = struct.calcsize(rec_fmt)
+		rec_unpack = struct.Struct(rec_fmt).unpack
+		bytesRead = rec_len
+		s = rec_unpack(self.fileptr.read(rec_len))
+
+		# self.numberOfBytes   = s[0]
+		self.STX					= s[1]
+		self.typeOfDatagram			= chr(s[2])
+		self.EMModel				= s[3]
+		self.RecordDate				= s[4]
+		self.Time					= float(s[5]/1000.0)
+		self.PingCounter	 		= s[6]
+		self.SerialNumber			= s[7]
+
+		self.NumTransmitSector		= s[8]
+		self.NumReceiveBeams 		= s[9]
+		self.SampleFrequency 		= float (s[10] / 100)
+		self.ROVDepth				= s[11]
+		self.SoundSpeedAtTransducer = s[12] / 10
+		self.MaxBeamsPossible  		= s[13]
+		self.Spare1		  			= s[14]
+		self.Spare2		  			= s[15]
+
+		self.TiltAngle						= [0 for i in range(self.NumTransmitSector)]
+		self.FocusRange						= [0 for i in range(self.NumTransmitSector)]
+		self.SignalLength					= [0 for i in range(self.NumTransmitSector)]
+		self.SectorTransmitDelay			= [0 for i in range(self.NumTransmitSector)]
+		self.CentreFrequency				= [0 for i in range(self.NumTransmitSector)]
+		self.MeanAbsorption					= [0 for i in range(self.NumTransmitSector)]
+		self.SignalWaveformID				= [0 for i in range(self.NumTransmitSector)]
+		self.TransmitSectorNumberTX			= [0 for i in range(self.NumTransmitSector)]
+		self.SignalBandwidth				= [0 for i in range(self.NumTransmitSector)]
+
+		self.BeamPointingAngle				= [0 for i in range(self.NumReceiveBeams)]
+		self.TransmitSectorNumber			= [0 for i in range(self.NumReceiveBeams)]
+		self.DetectionInfo					= [0 for i in range(self.NumReceiveBeams)]
+		self.DetectionWindow				= [0 for i in range(self.NumReceiveBeams)]
+		self.QualityFactor					= [0 for i in range(self.NumReceiveBeams)]
+		self.DCorr							= [0 for i in range(self.NumReceiveBeams)]
+		self.TwoWayTravelTime				= [0 for i in range(self.NumReceiveBeams)]
+		self.Reflectivity					= [0 for i in range(self.NumReceiveBeams)]
+		self.RealtimeCleaningInformation	= [0 for i in range(self.NumReceiveBeams)]
+		self.Spare							= [0 for i in range(self.NumReceiveBeams)]
+		self.BeamNumber						= [0 for i in range(self.NumReceiveBeams)]
+
+		# # now read the variable part of the Transmit Record
+		rec_fmt = '=hHLLLHBB'			
+		rec_len = struct.calcsize(rec_fmt)
+		rec_unpack = struct.Struct(rec_fmt).unpack
+		for i in range(self.NumTransmitSector):
+			data = self.fileptr.read(rec_len)
+			bytesRead += rec_len
+			s = rec_unpack(data)
+			self.TiltAngle[i]				= float (s[0]) / 100.0
+			self.FocusRange[i]				= s[1] * 10
+			self.SignalLength[i]			= s[2]
+			self.SectorTransmitDelay[i]		= s[3]
+			self.CentreFrequency[i]			= s[4]
+			self.SignalBandwidth[i] 		= s[5]
+			self.SignalWaveformID[i]		= s[6]
+			self.TransmitSectorNumberTX[i]	= s[7]
+		
+		# now read the variable part of the recieve record
+		rx_rec_fmt = '=hHBbBBhH'
+		rx_rec_len = struct.calcsize(rx_rec_fmt)
+		rx_rec_unpack = struct.Struct(rx_rec_fmt).unpack
+
+		for i in range(self.NumReceiveBeams):
+			data = self.fileptr.read(rx_rec_len)
+			rx_s = rx_rec_unpack(data)
+			bytesRead += rx_rec_len
+			self.BeamPointingAngle[i]			= float (rx_s[0]) / float (100)
+			self.TwoWayTravelTime[i]			= float (rx_s[1]) / ( 4 * self.SampleFrequency / 100)
+			self.TransmitSectorNumber[i]		= rx_s[2]
+			self.Reflectivity[i]				= rx_s[3] / 2.0
+			self.QualityFactor[i]				= rx_s[4]
+			self.DetectionWindow[i]				= rx_s[5]
+			self.BeamNumber						= rx_s[6]
+		
+		rec_fmt = '=BBH'
+		rec_len = struct.calcsize(rec_fmt)
+		rec_unpack = struct.Struct(rec_fmt).unpack_from
+		data = self.fileptr.read(rec_len)
+		s = rec_unpack(data)
+			
+		self.ETX				= s[1]
+		self.checksum		   = s[2]
+###############################################################################
+class h_HEIGHT:
 	def __init__(self, fileptr, numberOfBytes):
 		self.typeOfDatagram = 'h'
 		self.offset = fileptr.tell()
@@ -697,7 +820,7 @@ class H_HEIGHT:
 
 	def read(self):
 		self.fileptr.seek(self.offset, 0)
-		rec_fmt = '=LBBHLLHHlBBH'
+		rec_fmt = '=LBBHLLHHlB'
 		rec_len = struct.calcsize(rec_fmt)
 		rec_unpack = struct.Struct(rec_fmt).unpack_from
 		s = rec_unpack(self.fileptr.read(rec_len))
@@ -715,8 +838,11 @@ class H_HEIGHT:
 		# now read the footer
 		self.ETX, self.checksum = readFooter(self.numberOfBytes, self.fileptr)
 
-###############################################################################
-class H_HEIGHT_ENCODER:
+##############################################################################
+class h_HEIGHT_ENCODER:
+	def __init__(self):
+		self.data = 0
+
 	def encode(self, height, recordDate, recordTime, counter):
 		'''Encode a Height datagram record'''
 		rec_fmt = '=LBBHLLHHlBBH'
@@ -728,7 +854,11 @@ class H_HEIGHT_ENCODER:
 		ETX = 3
 		checksum = 0
 		model = 2045 #needs to be a sensible value to record is valid.  Maybe would be better to pass this from above
-		header = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType), ETX, checksum)
+		try:
+			header = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType), ETX, checksum)
+		except:
+			print ("error encoding height field")
+			# header = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType), ETX, checksum)
 		return header
 
 ###############################################################################
@@ -857,21 +987,21 @@ class N_TRAVELTIME:
 		self.PingCounter	 = s[6]
 		self.SerialNumber	= s[7]
 		self.SoundSpeedAtTransducer = s[8]
-		self.NumTransitSector= s[9]
+		self.NumTransmitSector= s[9]
 		self.NumReceiveBeams = s[10]
 		self.NumValidDetect  = s[11]
 		self.SampleFrequency = float (s[12])
 		self.DScale		  = s[13]
 
-		self.TiltAngle					= [0 for i in range(self.NumTransitSector)]
-		self.FocusRange				   = [0 for i in range(self.NumTransitSector)]
-		self.SignalLength				 = [0 for i in range(self.NumTransitSector)]
-		self.SectorTransmitDelay		  = [0 for i in range(self.NumTransitSector)]
-		self.CentreFrequency			  = [0 for i in range(self.NumTransitSector)]
-		self.MeanAbsorption			   = [0 for i in range(self.NumTransitSector)]
-		self.SignalWaveformID			 = [0 for i in range(self.NumTransitSector)]
-		self.TransmitSectorNumberTX	   = [0 for i in range(self.NumTransitSector)]
-		self.SignalBandwidth			  = [0 for i in range(self.NumTransitSector)]
+		self.TiltAngle					= [0 for i in range(self.NumTransmitSector)]
+		self.FocusRange				   = [0 for i in range(self.NumTransmitSector)]
+		self.SignalLength				 = [0 for i in range(self.NumTransmitSector)]
+		self.SectorTransmitDelay		  = [0 for i in range(self.NumTransmitSector)]
+		self.CentreFrequency			  = [0 for i in range(self.NumTransmitSector)]
+		self.MeanAbsorption			   = [0 for i in range(self.NumTransmitSector)]
+		self.SignalWaveformID			 = [0 for i in range(self.NumTransmitSector)]
+		self.TransmitSectorNumberTX	   = [0 for i in range(self.NumTransmitSector)]
+		self.SignalBandwidth			  = [0 for i in range(self.NumTransmitSector)]
 
 		self.BeamPointingAngle			= [0 for i in range(self.NumReceiveBeams)]
 		self.TransmitSectorNumber		 = [0 for i in range(self.NumReceiveBeams)]
@@ -888,7 +1018,7 @@ class N_TRAVELTIME:
 		rec_fmt = '=hHfffHBBf'			
 		rec_len = struct.calcsize(rec_fmt)
 		rec_unpack = struct.Struct(rec_fmt).unpack
-		for i in range(self.NumTransitSector):
+		for i in range(self.NumTransmitSector):
 			data = self.fileptr.read(rec_len)
 			bytesRead += rec_len
 			s = rec_unpack(data)
@@ -1053,6 +1183,7 @@ class R_RUNTIME:
 		self.filterIdentifier2			   = s[32]
 		self.ETX							= s[33]
 		self.checksum					   = s[34]
+
 		self.beamSpacingString = "Determined by beamwidth"
 		if (isBitSet(self.beamSpacing, 0)):
 			self.beamSpacingString = "Equidistant"
@@ -1062,6 +1193,7 @@ class R_RUNTIME:
 			self.beamSpacingString = "High density equidistant"
 		if (isBitSet(self.beamSpacing, 7)):
 			self.beamSpacingString = self.beamSpacingString + "+Two Heads"
+
 		self.yawAndPitchStabilisationMode   = "Yaw stabilised OFF"
 		if (isBitSet(self.yawMode, 0)):
 			self.yawAndPitchStabilisationMode = "Yaw stabilised ON"
@@ -1099,9 +1231,9 @@ class R_RUNTIME:
 
 		self.dualSwathMode = "Off";
 		if (isBitSet(self.mode, 6)):
-			dualSwathMode = "Fixed";
+			self.dualSwathMode = "Fixed";
 		if (isBitSet(self.mode, 7)):
-			dualSwathMode = "Dynamic";
+			self.dualSwathMode = "Dynamic";
 
 		self.filterSetting = "SpikeFilterOff";
 		if (isBitSet(self.filterIdentifier, 0)):
@@ -1124,7 +1256,85 @@ class R_RUNTIME:
 			self.filterSetting += "+AerationFilterOn";
 		if (isBitSet(self.filterIdentifier, 6)):
 			self.filterSetting += "+InterferenceFilterOn";
-		return
+
+
+	def header(self):
+		header = ""
+		header += "typeOfDatagram,"
+		header += "EMModel,"
+		header += "RecordDate,"
+		header += "Time,"
+		header += "Counter,"
+		header += "SerialNumber,"
+		header += "operatorStationStatus,"
+		header += "processingUnitStatus,"
+		header += "BSPStatus,"
+		header += "sonarHeadStatus,"
+		header += "mode,"
+		header += "dualSwathMode,"
+		header += "TXPulseForm,"
+		header += "filterIdentifier,"
+		header += "filterSetting,"
+		header += "minimumDepth,"
+		header += "maximumDepth,"
+		header += "absorptionCoefficient,"
+		header += "transmitPulseLength,"
+		header += "transmitBeamWidth,"
+		header += "transmitPower,"
+		header += "receiveBeamWidth,"
+		header += "receiveBandwidth,"
+		header += "mode2,"
+		header += "tvg,"
+		header += "sourceOfSpeedSound,"
+		header += "maximumPortWidth,"
+		header += "beamSpacing,"
+		header += "maximumPortCoverageDegrees,"
+		header += "yawMode,"
+		header += "yawAndPitchStabilisationMode,"
+		header += "maximumStbdCoverageDegrees,"
+		header += "maximumStbdWidth,"
+		header += "transmitAAlongTilt,"
+		header += "filterIdentifier2,"
+		return header
+
+	def parameters(self):
+		'''this function returns the runtime record in a human readmable format.  there are 2 strings returned, teh header which changes with every record and the paramters which only change when the user changes a setting.  this means we can reduce duplicate records by testing the parameters string for changes'''
+		s = '%s,%d,' %(self.operatorStationStatus, self.processingUnitStatus)
+		s += '%d,%d,' %(self.BSPStatus, self.sonarHeadStatus)
+		s += '%d,%s,%s,%d,%s,' %(self.mode, self.dualSwathMode, self.TXPulseForm, self.filterIdentifier, self.filterSetting)
+		s += '%.3f,%.3f,' %(self.minimumDepth, self.maximumDepth)
+		s += '%.3f,%.3f,' %(self.absorptionCoefficient, self.transmitPulseLength)
+		s += '%.3f,%.3f,' %(self.transmitBeamWidth, self.transmitPower)
+		s += '%.3f,%.3f,' %(self.receiveBeamWidth, self.receiveBandwidth)
+		s += '%d,%.3f,' %(self.mode2, self.tvg)
+		s += '%d,%d,' %(self.sourceOfSpeedSound, self.maximumPortWidth)
+		s += '%.3f,%d,' %(self.beamSpacing, self.maximumPortCoverageDegrees)
+		s += '%s,%s,%d,' %(self.yawMode, self.yawAndPitchStabilisationMode, self.maximumStbdCoverageDegrees)
+		s += '%d,%d,' %(self.maximumStbdWidth, self.transmitAAlongTilt)
+		s += '%s' %(self.filterIdentifier2)
+		return s
+
+	def __str__(self):
+		'''this function returns the runtime record in a human readmable format.  there are 2 strings returned, teh header which changes with every record and the paramters which only change when the user changes a setting.  this means we can reduce duplicate records by testing the parameters string for changes'''
+		s = '%s,%d,' %(self.typeOfDatagram, self.EMModel)
+		s += '%s,%.3f,' %(self.RecordDate, self.Time)
+		s += '%d,%d,' %(self.Counter, self.SerialNumber)
+		s += '%s,%d,' %(self.operatorStationStatus, self.processingUnitStatus)
+		s += '%d,%d,' %(self.BSPStatus, self.sonarHeadStatus)
+		s += '%d,%s,%s,%d,%s,' %(self.mode, self.dualSwathMode, self.TXPulseForm, self.filterIdentifier, self.filterSetting)
+		s += '%.3f,%.3f,' %(self.minimumDepth, self.maximumDepth)
+		s += '%.3f,%.3f,' %(self.absorptionCoefficient, self.transmitPulseLength)
+		s += '%.3f,%.3f,' %(self.transmitBeamWidth, self.transmitPower)
+		s += '%.3f,%.3f,' %(self.receiveBeamWidth, self.receiveBandwidth)
+		s += '%d,%.3f,' %(self.mode2, self.tvg)
+		s += '%d,%d,' %(self.sourceOfSpeedSound, self.maximumPortWidth)
+		s += '%.3f,%d,' %(self.beamSpacing, self.maximumPortCoverageDegrees)
+		s += '%s,%s,%d,' %(self.yawMode, self.yawAndPitchStabilisationMode, self.maximumStbdCoverageDegrees)
+		s += '%d,%d,' %(self.maximumStbdWidth, self.transmitAAlongTilt)
+		s += '%s' %(self.filterIdentifier2)
+		return s
+
+		# return pprint.pformat(vars(self))
 
 ###############################################################################
 class UNKNOWN_RECORD:
@@ -1422,7 +1632,7 @@ def to_timestamp(dateObject):
 	return (dateObject - datetime(1970, 1, 1)).total_seconds()
 
 def to_DateTime(recordDate, recordTime):
-	'''return a python date object from a split date and time record'''
+	'''return a python date object from a split date and time record. works with kongsberg date and time structures'''
 	date_object = datetime.strptime(str(recordDate), '%Y%m%d') + timedelta(0,recordTime)
 	return date_object
 
@@ -1509,3 +1719,4 @@ def crc16(data: bytes):
 
 if __name__ == "__main__":
 		main()
+		# exit()
