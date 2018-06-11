@@ -43,7 +43,7 @@ def main():
 	parser.add_argument('-nadir', action='store_true', default=False, dest='nadir', help='Output a CSV file of the nadir beam.  [Default: False]')
 	parser.add_argument('-bscorr', action='store_true', default=False, dest='bscorr', help='Output the backscatter bscorr.txt file as used in the PU.  This is useful for backscatter calibration and processing, and removes the need to telnet into the PU.   [Default: False]')
 	parser.add_argument('-splitd', action='store_true', default=False, dest='splitd', help='split the .all file every time the depth mode changes.  [Default: False]')
-	parser.add_argument('-splitt', dest='splitt', action='store', default="", help='Split the .all file based on time inm secnds e.g. -splitt 60')
+	parser.add_argument('-splitt', dest='splitt', action='store', default="", help='Split the .all file based on time in seconds e.g. -splitt 60')
 	parser.add_argument('-attitude', action='store_true', default=False, dest='attitude', help='Output a CSV file of "A" ATTITUDE.  [Default: False]')
 	parser.add_argument('-attitudeHeight', action='store_true', default=False, dest='attitudeHeight', help='Output a CSV file of the COMBINED "A" ATTITUDE and "h" HEIGHT.  [Default: False]')
 	parser.add_argument('-height', action='store_true', default=False, dest='height', help='Output a CSV file of "h" HEIGHT datagrams.  [Default: False]')
@@ -53,6 +53,8 @@ def main():
 	parser.add_argument('-runtime', dest='runtime', action='store_true', default=False, help='dump the runtime records for QC purposes')
 	parser.add_argument('-wobble', dest='wobble', action='store_true', default=False, help='compute the heave and roll related wobble from the raw observations for QC purposes')
 	parser.add_argument('-beamqc', dest='beamqc', action='store_true', default=False, help='for QC purposes compute a best fit line through each ping and the delta Z for each beam, then compute the mean deviation. Identify noisy beams.')
+	parser.add_argument('-testfwrite', dest='testfwrite', action='store_true', default=False, help='test the encoding of f records.')
+	parser.add_argument('-testdwrite', dest='testdwrite', action='store_true', default=True, help='test the encoding of D records.')
 
 	if len(sys.argv)==1:
 		parser.print_help()
@@ -84,6 +86,8 @@ def main():
 	splitfileend		= 0
 	wobble				= False
 	beamQC 				= False
+	testfwrite			= False
+	testdwrite			= False
 	if args.recursive:
 		for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
 			for f in fnmatch.filter(filenames, '*.all'):
@@ -98,7 +102,7 @@ def main():
 		# print (matches)
 
 	if len(matches) == 0:
-		print ("Nothing found in %s to condition, quitting" % args.inputFile)
+		print ("No files found in %s to process, quitting" % args.inputFile)
 		exit()
 
 	if len(args.splitt) > 0:
@@ -107,6 +111,16 @@ def main():
 
 	if len(args.exclude) > 0:
 		print ("Excluding datagrams: %s :" % args.exclude)
+
+	if args.testfwrite:
+		testfwrite = True
+		args.exclude = 'f' # we need to NOT write out the original data as we will be creating new records
+		writeConditionedFile = True # we dont need to write a conditioned .all file
+
+	if args.testdwrite:
+		testdwrite = True
+		args.exclude = 'D' # we need to NOT write out the original data as we will be creating new records
+		writeConditionedFile = True # we dont need to write a conditioned .all file
 
 	if len(args.conditionbs) > 0:
 		beamPointingAngles = []
@@ -220,10 +234,10 @@ def main():
 		installStart, installStop, initialMode, datagram = r.loadInstallationRecords()
 		head = getHead(heads, datagram.SerialNumber)
 		head.installationParameters = datagram.installationParameters
-		head.Roll = head.installationParameters['S1R']
+		head.installationRollAngle = float(head.installationParameters['S1R'])
 		head = getHead(heads, datagram.SecondarySerialNumber)
 		head.installationParameters = datagram.installationParameters
-		head.Roll = head.installationParameters['S2R']
+		head.installationRollAngle = float(head.installationParameters['S2R'])
 		r.close()
 
 	if args.wobble:
@@ -348,6 +362,40 @@ def main():
 			if beamQC:
 				if TypeOfDatagram == 'f':
 					datagram.read()
+					# figure out which head
+					head = getHead(heads, datagram.SerialNumber)
+
+					ping = cPing(datagram.NumReceiveBeams, head.installationRollAngle)
+					ping.BeamPointingAngle = datagram.BeamPointingAngle
+					ping.TwoWayTravelTime = datagram.TwoWayTravelTime
+					ping.SoundSpeedAtTransducer = datagram.SoundSpeedAtTransducer
+					ping.BeamNumber = datagram.BeamNumber
+					# now compute the approximate depth
+					ping.calcDepth()
+
+
+					# compute a best fit line through the ping of data so we can compute the slope and intercept
+					slope, intercept, rvalue, pvalue, stderr = stats.linregress(ping.Dy, ping.Dz)
+					# y = mx + c
+					for idx, val in enumerate(ping.Dy):
+						# if datagram.QualityFactor[idx] > 0:
+						# 	continue #skip rejected beams
+						beamNum = ping.BeamNumber[idx]
+						if not beamNum in head.beamSum:
+							head.beamSum[beamNum] = (ping.Dz[idx] - ((slope * val) + intercept))
+							head.beamAngle[beamNum] = ping.BeamPointingAngle[idx]
+							head.beamCount[beamNum] = 1
+						else:
+							head.beamSum[beamNum] += (ping.Dz[idx] - ((slope * val) + intercept))
+							head.beamAngle[beamNum] = ping.BeamPointingAngle[idx]
+							head.beamCount[beamNum] += 1
+					# draw a single profile good for debugging
+					# plt.figure(figsize=(12,4))
+					# plt.title(datagram.SerialNumber)
+					# raw = plt.plot(ping.Dy, ping.Dz)
+					# plt.show(False)
+					continue
+
 				if TypeOfDatagram == 'D' or TypeOfDatagram == 'X':
 					datagram.read()
 					if len(datagram.AcrossTrackDistance) > 1:
@@ -512,15 +560,7 @@ def main():
 					continue
 				if args.injectAHFileName.lower().endswith('.txt'):
 					counter, lastHeightTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), ATTSubset, counter, True, lastHeightTimeStamp)
-
-				# this is a testbed until we figure out how caris handles the application of heave.
-				# if TypeOfDatagram == 'X':
-				#	 datagram.read()
-				#	 # now encode the datagram back, making changes along the way
-				#	 datagram.TransducerDepth = 999
-				#	 dg = datagram.encode()
-				#	 outAttitudeFilePtr.write(dg)
-				#	 continue #we do not want to write the records twice!
+					continue
 
 			if extractBackscatter:
 				'''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
@@ -539,6 +579,26 @@ def main():
 						ARC[arcIndex].numberOfSamplesPerBeam = ARC[arcIndex].numberOfSamplesPerBeam + len(datagram.beams[i].samples)
 						ARC[arcIndex].sector = transmitSector[i]
 				continue
+
+			if testdwrite:
+				if TypeOfDatagram == 'D':
+					datagram.read()
+					for idx, val in enumerate(datagram.QualityFactor):
+						# datagram.QualityFactor[idx] = 0
+						datagram.Depth[idx] += 100
+					bytes = datagram.encode()
+					outFilePtr.write(bytes)
+					continue
+
+			if testfwrite:
+				if TypeOfDatagram == 'f':
+					datagram.read()
+					# for idx, val in enumerate(datagram.TwoWayTravelTime):
+					# 	if idx > 113 and idx < 126:
+					# 		datagram.TwoWayTravelTime[idx] *= 0.90
+					bytes = datagram.encode()
+					outFilePtr.write(bytes)
+					continue
 			
 			if conditionBS:
 				if TypeOfDatagram == 'N':
@@ -552,12 +612,15 @@ def main():
 					datagram.BeamPointingAngle = beamPointingAngles
 					bytes = datagram.encode()
 					outFilePtr.write(bytes)
+					continue
 
 			if extractSVP:
 				extractProfile(datagram, TypeOfDatagram, r.currentRecordDateTime(), latitude, longitude, filename, args.odir)
+				continue
 
 			if extractBSCorr:
 				extractBSCorrData(datagram, TypeOfDatagram, filename, args.odir)
+				continue
 		
 			# the user has opted to skip this datagram, so continue
 			if TypeOfDatagram in args.exclude:
@@ -566,8 +629,8 @@ def main():
 			if writeConditionedFile:
 				outFilePtr.write(rawBytes)
 
-			if r.recordCounter > 1000:
-				break
+			# if r.recordCounter > 1000:
+			# 	break
 		# update_progress("Processed: %s (%d/%d)" % (filename, fileCounter, len(matches)), (fileCounter/len(matches)))
 		fileCounter +=1
 		r.close()
@@ -1081,8 +1144,38 @@ class cMBESHead:
 		self.beamCount = {}
 		self.beamAngle = {}
 		self.installationParameters = ''
-		self.Roll = 0
+		self.installationRollAngle = 0
 
+###############################################################################
+class cPing:
+	def __init__(self, NumBeams, installationRollAngle=0):
+		self.NumReceiveBeams = NumBeams
+		self.installationRollAngle = installationRollAngle
+		self.SoundSpeedAtTransducer = 1500
+		self.BeamNumber						= [0 for i in range(self.NumReceiveBeams)]
+		self.BeamPointingAngle				= [0 for i in range(self.NumReceiveBeams)]
+		self.TransmitSectorNumber			= [0 for i in range(self.NumReceiveBeams)]
+		self.DetectionInfo					= [0 for i in range(self.NumReceiveBeams)]
+		self.DetectionWindow				= [0 for i in range(self.NumReceiveBeams)]
+		self.QualityFactor					= [0 for i in range(self.NumReceiveBeams)]
+		self.TwoWayTravelTime				= [0 for i in range(self.NumReceiveBeams)]
+		self.SlantRange						= [0 for i in range(self.NumReceiveBeams)]
+		self.Reflectivity					= [0 for i in range(self.NumReceiveBeams)]
+		self.RealtimeCleaningInformation	= [0 for i in range(self.NumReceiveBeams)]
+		self.Dx								= [0 for i in range(self.NumReceiveBeams)]
+		self.Dy								= [0 for i in range(self.NumReceiveBeams)]
+		self.Dz								= [0 for i in range(self.NumReceiveBeams)]
+
+	def calcDepth(self):
+		for i in range(self.NumReceiveBeams):
+			try:
+				self.SlantRange[i] = self.TwoWayTravelTime[i] * 0.5 * (self.SoundSpeedAtTransducer -20)
+				# radAngle=math.radians(self.installationRollAngle - self.BeamPointingAngle[i] - self.installationRollAngle)
+				radAngle=math.radians(90 - self.installationRollAngle - self.BeamPointingAngle[i])
+				self.Dy[i] = math.cos(radAngle) * self.SlantRange[i]
+				self.Dz[i] = math.sin(radAngle) * self.SlantRange[i]
+			except:
+				print("ffF")
 ###############################################################################
 class cWobble:
 	def __init__(self):

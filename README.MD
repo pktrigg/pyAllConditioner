@@ -10,13 +10,18 @@ pyAllConditioner
 
 2DO
 ===
+beamqc: Dx or raw range datagrams? test to ensure they are identical
+beamqc: write out results to csv
+beamqc: read and apply the results to the f datagrams
+beamqc: encode for D datagrams so we can reject or change the depths.  it looks like caris reads quality from D records.
 
-implement T_TIDE datagram so we can inject tide into a .all file.
 implement -splitsize
 implement -splitduration
 
 Done
 ====
+sort out checksums in encoders.  It now reads fine in sonar viewer
+add ENCODE for 'f' records
 added decode for 'f' datagrams (EM3002 raw ranges)
 added -odix so user can add an appendage to the filename
 injectAH attitude and height now implemented.  Height records are limited to sensible rates as they are only used for tides.

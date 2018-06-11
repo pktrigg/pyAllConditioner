@@ -1,15 +1,15 @@
 {
-    "version": "0.2.0",
-    "configurations": [        
-        {
-            "name": "Python",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "program": "${file}",
-            "pythonPath": "python.exe",
-			"args": ["-beamqc", "-i", "C:/projects/CARIS/GA-0362_ShoalBay_East_2/raw/0211_20170906_000453_AIMS_Capricornus.all"]
-        }
+	"version": "0.2.0",
+	"configurations": [		
+		{
+			"name": "Python",
+			"type": "python",
+			"request": "launch",
+			"stopOnEntry": false,
+			"program": "${file}",
+			"pythonPath": "python.exe",
+			"args": ["-testdwrite", "-i", "C:/development/python/0211_20170906_000453_AIMS_Capricornus.all", "-odir", "fwrite"]
+		}
 	]
 }
 "args": ["-i", "C:/projects/CARIS/AutoCleanTest1/raw/*.all", "-beamqc"]
@@ -17,12 +17,12 @@
 "args": ["-i", "C:/projects/CARIS/AutoCleanTest1/raw/*.all", "-injectAH", "C:/projects/CARIS/AutoCleanTest1/raw/*PROC_1.txt", "-exclude", "hA", "-odir", "conditioned", "-odix", "_pkpk]
 // "args": ["-odir", "wobble", "-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/0569simradFile.all", "-wobble"]
 "args": ["-i", "C:/projects/CARIS/GA-0361_ShallowWaterDHBH/all/delayedheave/0571simradFile.txt"]
-            "args": ["-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710_Original.all", "-splitd"]
-            "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
-            "args": ["-odir", "conditioned", "-i", "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all", "-conditionbs", "c:/projects/carisworldtour/preprocess/conditioned/angularResponseCurve.csv"]
-            "args": ["-svp", "-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"]
-            "args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "c:/projects/RVInvestigator/SRH_20161001_1475320090.srh"]
-            "args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]
-        "args": ["-i", "C:/development/python/sample.all", "-conditionbs", "ARC.csv"]
-        "args": ["-i", "C:/development/python/sample.all", "-extractbs"]
-            // "args": ["-r","-i", "C:/development/"]
+			"args": ["-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710_Original.all", "-splitd"]
+			"args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "*.srh"]
+			"args": ["-odir", "conditioned", "-i", "c:/projects/carisworldtour/preprocess/0010_20110308_194752.all", "-conditionbs", "c:/projects/carisworldtour/preprocess/conditioned/angularResponseCurve.csv"]
+			"args": ["-svp", "-odir", "conditioned", "-i", "d:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all"]
+			"args": ["-odir", "conditioned", "-i", "c:/projects/RVInvestigator/0073_20161001_103120_Investigator_em710.all", "-srh", "c:/projects/RVInvestigator/SRH_20161001_1475320090.srh"]
+			"args": ["-i", "C:/development/python/sample.all", "-srh", "C:/development/python/pyAllConditioner/attitude.csv"]
+		"args": ["-i", "C:/development/python/sample.all", "-conditionbs", "ARC.csv"]
+		"args": ["-i", "C:/development/python/sample.all", "-extractbs"]
+			// "args": ["-r","-i", "C:/development/"]

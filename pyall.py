@@ -42,9 +42,8 @@ def main():
 		print(typeOfDatagram, end='')
 		
 		rawbytes = r.readDatagramBytes(datagram.offset, datagram.numberOfBytes)
-		crc = crc16(rawbytes[4:-2])
-		# 51155
-		# # print(r.currentRecordDateTime())
+		# hereis how we compute the checksum
+		# print(sum(rawbytes[5:-3]))
 
 		if typeOfDatagram == '3':
 			datagram.read()
@@ -416,16 +415,17 @@ class A_ATTITUDE_ENCODER:
 		header_fmt = '=LBBHLLHHH'
 		header_len = struct.calcsize(header_fmt)
 
-		rec_fmt = "HHhhhH"
+		rec_fmt = "HHhhhHB"
 		rec_len = struct.calcsize(rec_fmt)
 
-		footer_fmt = '=BBH'
+		footer_fmt = '=BH'
 		footer_len = struct.calcsize(footer_fmt)
 
 		STX = 2
 		typeOfDatagram = 65
 		model = 2045
-
+		systemDescriptor = 0
+		systemDescriptor = set_bit(systemDescriptor, 0) #set heading is ENABLED (go figure!)
 		serialNumber = 999
 		numEntries = len(recordsToAdd)
 
@@ -454,23 +454,21 @@ class A_ATTITUDE_ENCODER:
 			heave   = float(record[3])
 			heading = float(record[4])
 			try:
-				bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
+				bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100), systemDescriptor)
 			except:
 				print ("error encoding attitude")
-				bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100))
+				bodyRecord = struct.pack(rec_fmt, timeMillisecs, sensorStatus, int(roll*100), int(pitch*100), int(heave*100), int(heading*100), systemDescriptor)
 			fullDatagram = fullDatagram + bodyRecord
 
 		# now do the footer 
-		systemDescriptor = 0
-		systemDescriptor = set_bit(systemDescriptor, 0) #set heading is ENABLED (go figure!)
 		# systemDescriptor = set_bit(systemDescriptor, 1) #set roll is DISABLED
 		# systemDescriptor = set_bit(systemDescriptor, 2) #set pitch is DISABLED
 		# systemDescriptor = set_bit(systemDescriptor, 3) #set heave is DISABLED
 		# systemDescriptor = set_bit(systemDescriptor, 4) #set SENSOR as system 2
 		# systemDescriptor = 30
 		ETX = 3
-		checksum = 0
-		footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+		checksum = sum(fullDatagram[5:]) % 65536
+		footer = struct.pack('=BH', ETX, checksum)
 		fullDatagram = fullDatagram + footer
 
 		# TEST THE CRC CODE pkpk
@@ -605,7 +603,7 @@ class D_DEPTH:
 		self.NBeams				 = s[12]
 		self.ZResolution			= float (s[13] / float (100))
 		self.XYResolution		   = float (s[14] / float (100))
-		self.SamplingFrequency	  = s[15]
+		self.SampleFrequency	  = s[15]
 
 		self.Depth						= [0 for i in range(self.NBeams)]
 		self.AcrossTrackDistance		  = [0 for i in range(self.NBeams)]
@@ -630,16 +628,16 @@ class D_DEPTH:
 		while i < self.NBeams:
 			data = self.fileptr.read(rec_len)
 			s = rec_unpack(data)
-			self.Depth[i]					   = float (s[0] / float (100))
-			self.AcrossTrackDistance[i]		 = float (s[1] / float (100))
-			self.AlongTrackDistance[i]		  = float (s[2] / float (100))
-			self.BeamDepressionAngle[i]		 = float (s[3] / float (100))
-			self.BeamAzimuthAngle[i]			= float (s[4] / float (100))
-			self.Range[i]					   = float (s[5] / float (100))
-			self.QualityFactor[i]			   = s[6]
-			self.LengthOfDetectionWindow[i]	 = s[7]
-			self.Reflectivity[i]				= float (s[8] / float (100))
-			self.BeamNumber[i]				  = s[9]
+			self.Depth[i]					= float (s[0] / float (100))
+			self.AcrossTrackDistance[i]		= float (s[1] / float (100))
+			self.AlongTrackDistance[i]		= float (s[2] / float (100))
+			self.BeamDepressionAngle[i]		= float (s[3] / float (100))
+			self.BeamAzimuthAngle[i]		= float (s[4] / float (100))
+			self.Range[i]					= float (s[5] / float (100))
+			self.QualityFactor[i]			= s[6]
+			self.LengthOfDetectionWindow[i]	= s[7]
+			self.Reflectivity[i]			= float (s[8] / float (100))
+			self.BeamNumber[i]				= s[9]
 
 			# now do some sanity checks.  We have examples where the Depth and Across track values are NaN
 			if (math.isnan(self.Depth[i])):
@@ -659,6 +657,75 @@ class D_DEPTH:
 		self.RangeMultiplier	= s[0]
 		self.ETX				= s[1]
 		self.checksum		   = s[2]
+
+###############################################################################
+	def encode(self):
+		'''Encode a Depth D datagram record'''
+		header_fmt = '=LBBHLLHHHHHBBBBH'
+		header_len = struct.calcsize(header_fmt)
+
+		fullDatagram = bytearray()
+
+		# now read the variable part of the Record
+		if self.EMModel < 700 :
+			rec_fmt = '=H3h2H2BbB'
+		else:
+			rec_fmt = '=4h2H2BbB'			
+		rec_len = struct.calcsize(rec_fmt)
+
+		footer_fmt = '=BBH'
+		footer_len = struct.calcsize(footer_fmt)
+
+		fullDatagramByteCount = header_len + (rec_len*self.NBeams) + footer_len
+
+		# pack the header
+		recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
+		header = struct.pack(header_fmt, 
+			fullDatagramByteCount-4, 
+			self.STX,
+			ord(self.typeOfDatagram), 
+			self.EMModel,
+			self.RecordDate,
+			recordTime,
+			int(self.Counter),
+			int(self.SerialNumber),
+			int(self.Heading * 100),
+			int(self.SoundSpeedAtTransducer * 10),
+			int(self.TransducerDepth * 100),
+			int(self.MaxBeams),
+			int(self.NBeams),
+			int(self.ZResolution * 100),
+			int(self.XYResolution * 100),
+			int(self.SampleFrequency))
+		fullDatagram = fullDatagram + header
+		header_fmt = '=LBBHLLHHHHHBBBBH'
+
+		# pack the beam summary info
+		for i in range (self.NBeams):
+			bodyRecord = struct.pack(rec_fmt, 
+				int(self.Depth[i] * 100),
+				int(self.AcrossTrackDistance[i] * 100),
+				int(self.AlongTrackDistance[i] * 100),
+				int(self.BeamDepressionAngle[i] * 100),
+				int(self.BeamAzimuthAngle[i] * 100),
+				int(self.Range[i] * 100),
+				self.QualityFactor[i],
+				self.LengthOfDetectionWindow[i],
+				int(self.Reflectivity[i] * 100),
+				self.BeamNumber[i])
+			fullDatagram = fullDatagram + bodyRecord
+
+		tmp = struct.pack('=b', self.RangeMultiplier)
+		fullDatagram = fullDatagram + tmp
+
+		# now pack the footer 
+		# systemDescriptor = 1
+		ETX = 3
+		checksum = sum(fullDatagram[5:]) % 65536
+		footer = struct.pack('=BH', ETX, checksum)
+		fullDatagram = fullDatagram + footer
+
+		return fullDatagram
 
 ###############################################################################
 class E_EXTRA:
@@ -738,9 +805,9 @@ class f_RAWRANGE:
 		self.SampleFrequency 		= float (s[10] / 100)
 		self.ROVDepth				= s[11]
 		self.SoundSpeedAtTransducer = s[12] / 10
-		self.MaxBeamsPossible  		= s[13]
-		self.Spare1		  			= s[14]
-		self.Spare2		  			= s[15]
+		self.MaxBeams				= s[13]
+		self.Spare1					= s[14]
+		self.Spare2					= s[15]
 
 		self.TiltAngle						= [0 for i in range(self.NumTransmitSector)]
 		self.FocusRange						= [0 for i in range(self.NumTransmitSector)]
@@ -773,7 +840,7 @@ class f_RAWRANGE:
 			bytesRead += rec_len
 			s = rec_unpack(data)
 			self.TiltAngle[i]				= float (s[0]) / 100.0
-			self.FocusRange[i]				= s[1] * 10
+			self.FocusRange[i]				= s[1] / 10
 			self.SignalLength[i]			= s[2]
 			self.SectorTransmitDelay[i]		= s[3]
 			self.CentreFrequency[i]			= s[4]
@@ -790,14 +857,14 @@ class f_RAWRANGE:
 			data = self.fileptr.read(rx_rec_len)
 			rx_s = rx_rec_unpack(data)
 			bytesRead += rx_rec_len
-			self.BeamPointingAngle[i]			= float (rx_s[0]) / float (100)
-			self.TwoWayTravelTime[i]			= float (rx_s[1]) / ( 4 * self.SampleFrequency / 100)
+			self.BeamPointingAngle[i]			= float (rx_s[0]) / 100.0
+			self.TwoWayTravelTime[i]			= float (rx_s[1]) / (4 * self.SampleFrequency)
 			self.TransmitSectorNumber[i]		= rx_s[2]
 			self.Reflectivity[i]				= rx_s[3] / 2.0
 			self.QualityFactor[i]				= rx_s[4]
 			self.DetectionWindow[i]				= rx_s[5]
-			self.BeamNumber						= rx_s[6]
-		
+			self.BeamNumber[i]					= rx_s[6]
+			
 		rec_fmt = '=BBH'
 		rec_len = struct.calcsize(rec_fmt)
 		rec_unpack = struct.Struct(rec_fmt).unpack_from
@@ -805,7 +872,87 @@ class f_RAWRANGE:
 		s = rec_unpack(data)
 			
 		self.ETX				= s[1]
-		self.checksum		   = s[2]
+		self.checksum			= s[2]
+
+###############################################################################
+	def encode(self):
+		'''Encode a Depth f datagram record'''
+		systemDescriptor = 1
+
+		header_fmt = '=LBBHLLHH HHLl4H'
+		header_len = struct.calcsize(header_fmt)
+
+		fullDatagram = bytearray()
+
+		# # now read the variable part of the Transmit Record
+		rec_fmt = '=hHLLLHBB'			
+		rec_len = struct.calcsize(rec_fmt)
+
+		# now read the variable part of the recieve record
+		rx_rec_fmt = '=hHBbBBhHB'
+		rx_rec_len = struct.calcsize(rx_rec_fmt)
+
+
+		footer_fmt = '=BH'
+		footer_len = struct.calcsize(footer_fmt)
+
+		fullDatagramByteCount = header_len + (rec_len*self.NumTransmitSector) + (rx_rec_len*self.NumReceiveBeams) + footer_len
+
+		# pack the header
+		recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
+		header = struct.pack(header_fmt, 
+			fullDatagramByteCount-4, 
+			self.STX, 
+			ord(self.typeOfDatagram), 
+			self.EMModel, 
+			self.RecordDate, 
+			recordTime, 
+			self.PingCounter, 
+			self.SerialNumber, 
+			self.NumTransmitSector, 
+			self.NumReceiveBeams, 
+			int(self.SampleFrequency * 100), 
+			self.ROVDepth,
+			int(self.SoundSpeedAtTransducer * 10),
+			self.MaxBeams,
+			self.Spare1, 
+			self.Spare2)
+		fullDatagram = fullDatagram + header
+
+		for i in range (self.NumTransmitSector):
+			sectorRecord = struct.pack(rec_fmt, 
+				int(self.TiltAngle[i] * 100),
+				int(self.FocusRange[i] * 10),
+				self.SignalLength[i],
+				self.SectorTransmitDelay[i],
+				self.CentreFrequency[i],
+				self.SignalBandwidth[i],
+				self.SignalWaveformID[i],
+				self.TransmitSectorNumberTX[i])
+			fullDatagram = fullDatagram + sectorRecord
+
+		# pack the beam summary info
+		for i in range (self.NumReceiveBeams):
+			bodyRecord = struct.pack(rx_rec_fmt, 
+				int(self.BeamPointingAngle[i] * 100.0),
+				int(self.TwoWayTravelTime[i] * (4 * self.SampleFrequency)),
+				self.TransmitSectorNumber[i],
+				int(self.Reflectivity[i] * 2.0),
+				self.QualityFactor[i],
+				self.DetectionWindow[i],
+				self.BeamNumber[i],
+				self.Spare1,
+				systemDescriptor)
+			fullDatagram = fullDatagram + bodyRecord
+
+		# now pack the footer 
+		ETX = 3
+		checksum = sum(fullDatagram[5:]) % 65536
+		footer = struct.pack('=BH', ETX, checksum)
+		fullDatagram = fullDatagram + footer
+
+		return fullDatagram
+		
 ###############################################################################
 class h_HEIGHT:
 	def __init__(self, fileptr, numberOfBytes):
@@ -845,21 +992,24 @@ class h_HEIGHT_ENCODER:
 
 	def encode(self, height, recordDate, recordTime, counter):
 		'''Encode a Height datagram record'''
-		rec_fmt = '=LBBHLLHHlBBH'
+		rec_fmt = '=LBBHLLHHlB'
 		rec_len = struct.calcsize(rec_fmt)
 		heightType = 0 #0 = the height of the waterline at the vertical datum (from KM datagram manual)
 		serialNumber = 999
 		STX = 2
 		typeOfDatagram = 'h'
-		ETX = 3
 		checksum = 0
 		model = 2045 #needs to be a sensible value to record is valid.  Maybe would be better to pass this from above
 		try:
-			header = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType), ETX, checksum)
+			fullDatagram = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType))
+			ETX = 3
+			checksum = sum(fullDatagram[5:]) % 65536
+			footer = struct.pack('=BH', ETX, checksum)
+			fullDatagram = fullDatagram + footer
 		except:
 			print ("error encoding height field")
 			# header = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType), ETX, checksum)
-		return header
+		return fullDatagram
 
 ###############################################################################
 class I_INSTALLATION:
@@ -1426,7 +1576,7 @@ class X_DEPTH:
 		self.TransducerDepth		= s[10]
 		self.NBeams				 = s[11]
 		self.NValidDetections	   = s[12]
-		self.SamplingFrequency	  = s[13]
+		self.SampleFrequency	  = s[13]
 		self.ScanningInfo		   = s[14]
 		self.spare1				 = s[15]
 		self.spare2				 = s[16]
@@ -1495,7 +1645,7 @@ class X_DEPTH:
 
 		# pack the header
 		recordTime = int(dateToSecondsSinceMidnight(from_timestamp(self.Time))*1000)
-		header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.typeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.TransducerDepth, self.NBeams, self.NValidDetections, self.SamplingFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3)
+		header = struct.pack(header_fmt, fullDatagramByteCount-4, self.STX, ord(self.typeOfDatagram), self.EMModel, self.RecordDate, recordTime, self.Counter, self.SerialNumber, int(self.Heading * 100), int(self.SoundSpeedAtTransducer * 10), self.TransducerDepth, self.NBeams, self.NValidDetections, self.SampleFrequency, self.ScanningInfo, self.spare1, self.spare2, self.spare3)
 		fullDatagram = fullDatagram + header
 
 		# pack the beam summary info
@@ -1503,11 +1653,15 @@ class X_DEPTH:
 			bodyRecord = struct.pack(rec_fmt, self.Depth[i], self.AcrossTrackDistance[i], self.AlongTrackDistance[i], self.DetectionWindowsLength[i], self.QualityFactor[i], int(self.BeamIncidenceAngleAdjustment[i]*10), self.DetectionInformation[i], self.RealtimeCleaningInformation[i], int(self.Reflectivity[i]*10), )
 			fullDatagram = fullDatagram + bodyRecord
 
-		# now pack the footer 
 		systemDescriptor = 1
+		tmp = struct.pack('=B', systemDescriptor)
+		fullDatagram = fullDatagram + tmp
+
+		# now pack the footer 
 		ETX = 3
 		checksum = 0
-		footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+		
+		footer = struct.pack('=BH', ETX, checksum)
 		fullDatagram = fullDatagram + footer
 
 		return fullDatagram
@@ -1616,11 +1770,14 @@ class Y_SEABEDIMAGE:
 		sampleRecord = struct.pack(sample_fmt, *s)
 		fullDatagram = fullDatagram + sampleRecord
 
-		# now pack the footer 
 		systemDescriptor = 1
+		tmp = struct.pack('=B', systemDescriptor)
+		fullDatagram = fullDatagram + tmp
+
+		# now pack the footer 
 		ETX = 3
 		checksum = 0
-		footer = struct.pack('=BBH', systemDescriptor, ETX, checksum)
+		footer = struct.pack('=BH', ETX, checksum)
 		fullDatagram = fullDatagram + footer
 
 		return fullDatagram
@@ -1658,64 +1815,6 @@ def isBitSet(int_type, offset):
 
 def set_bit(value, bit):
     return value | (1<<bit)
-
-def swap16(i):
-	return struct.unpack("<H", struct.pack(">H", i))[0]
-
-def typecasting(crc):
-	msb = hex(crc >> 8)
-	lsb = hex(crc & 0x00FF)
-	return lsb + msb
-
-def crc16(data: bytes):
-	'''
-	CRC-16-CCITT Algorithm
-	'''
-	data = bytearray(data)
-	poly = 0x8408
-	crc = 0xFFFF
-	for b in data:
-		cur_byte = b & 0xFF
-		for _ in range(0, 8):
-			if (crc & 0x0001) ^ (cur_byte & 0x0001):
-				crc = (crc >> 1) ^ poly
-			else:
-				crc >>= 1
-
-			cur_byte >>= 1
-	crc = ~crc
-	crc = (crc << 8) | ((crc >> 8) & 0xFF)
-	return ctypes.c_ushort(crc).value
-
-# #define POLY 0x8408
-# unsigned short blkcrc(unsigned char *bufptr, /* message buffer */ unsigned long len /* number of bytes */ )
-# {
-# unsigned char i;
-# unsigned short data;
-# unsigned short crc = 0xffff;
-# if (len == 0L) 
-# {
-#   return ~crc;
-# }
-# do 
-# {
-#   for (i=0, data = (unsigned short) (0xff & *bufptr++); i < 8; i++, data >>= 1) 
-#   {
-#	   if ((crc & 0x0001) ^ (data & 0x0001)) 
-#	   {
-#		   crc = (crc >> 1) ^ POLY;
-#	   } 
-#	   else 
-#	   {
-#		   crc >>= 1;
-#	   }
-#   }
-# } while (--len);
-# crc = ~crc;
-# data = crc;
-# crc = (crc << 8) | ((data >> 8) & 0xff);
-# return crc;
-# }
 
 if __name__ == "__main__":
 		main()
