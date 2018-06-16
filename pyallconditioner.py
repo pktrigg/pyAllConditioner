@@ -119,7 +119,7 @@ def main():
 
 	if args.testdwrite:
 		testdwrite = True
-		args.exclude = 'D' # we need to NOT write out the original data as we will be creating new records
+		args.exclude += 'D' # we need to NOT write out the original data as we will be creating new records
 		writeConditionedFile = True # we dont need to write a conditioned .all file
 
 	if len(args.conditionbs) > 0:
@@ -584,8 +584,26 @@ def main():
 				if TypeOfDatagram == 'D':
 					datagram.read()
 					for idx, val in enumerate(datagram.QualityFactor):
-						# datagram.QualityFactor[idx] = 0
-						datagram.Depth[idx] += 100
+						datagram.QualityFactor[idx] = 0
+						# datagram.Depth[idx] += 100
+					bytes = datagram.encode()
+					outFilePtr.write(bytes)
+					continue
+					# test by rejecting all f records as well...
+				if TypeOfDatagram == 'f':
+					datagram.read()
+					for idx, val in enumerate(datagram.QualityFactor):
+						datagram.QualityFactor[idx] = 0
+					# for idx, val in enumerate(datagram.TwoWayTravelTime):
+					# 	if idx > 113 and idx < 126:
+					# 		datagram.TwoWayTravelTime[idx] *= 0.90
+					bytes = datagram.encode()
+					outFilePtr.write(bytes)
+					continue
+				if TypeOfDatagram == 'O':
+					datagram.read()
+					for idx, val in enumerate(datagram.QualityFactor):
+						datagram.QualityFactor[idx] = 0
 					bytes = datagram.encode()
 					outFilePtr.write(bytes)
 					continue

@@ -8,7 +8,7 @@
 			"stopOnEntry": false,
 			"program": "${file}",
 			"pythonPath": "python.exe",
-			"args": ["-testdwrite", "-i", "C:/development/python/0211_20170906_000453_AIMS_Capricornus.all", "-odir", "fwrite"]
+			"args": ["-testdwrite", "-i", "C:/development/python/0211_20170906_000453_AIMS_Capricornus.all", "-odir", "conditioned", "-exclude", "S"]
 		}
 	]
 }
