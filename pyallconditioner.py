@@ -16,6 +16,7 @@ from datetime import datetime
 from datetime import timedelta
 from glob import glob
 import pyall
+import POSMVRead
 import struct
 import numpy as np
 # from bisect import bisect_left, bisect_right
@@ -114,13 +115,14 @@ def main():
 
 	if args.testfwrite:
 		testfwrite = True
-		args.exclude = 'f' # we need to NOT write out the original data as we will be creating new records
+		# args.exclude = 'f' # we need to NOT write out the original data as we will be creating new records
 		writeConditionedFile = True # we dont need to write a conditioned .all file
 
 	if args.testdwrite:
 		testdwrite = True
-		args.exclude += 'D' # we need to NOT write out the original data as we will be creating new records
+		# args.exclude += 'D' # we need to NOT write out the original data as we will be creating new records
 		writeConditionedFile = True # we dont need to write a conditioned .all file
+		dwrite = 0
 
 	if len(args.conditionbs) > 0:
 		beamPointingAngles = []
@@ -153,6 +155,8 @@ def main():
 			ATT = ATTReader()
 			ATT.loadFiles(args.injectAFileName)
 			print ("Records to inject: %d" % len(ATT.ATTData))
+		else:
+			print ("Injecting POSMV True Heave Data...")
 
 	if len(args.injectAHFileName) > 0:
 		injectAttitudeHeight = True
@@ -247,6 +251,13 @@ def main():
 		attitudeData = []
 # #################################################################################
 	for filename in matches:
+		if injectAttitude:
+			# find out the first and last timestamps in the .all file
+			r = pyall.ALLReader(filename)
+			count, start, end = r.getRecordCount()
+			# load the heave data from the posmv files
+			POSMVRead.loadData(args.injectAFileName, start, end)
+			r.close()
 		if extractAttitude:
 			# create an output file based on the input
 			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
@@ -584,16 +595,20 @@ def main():
 				if TypeOfDatagram == 'D':
 					datagram.read()
 					for idx, val in enumerate(datagram.QualityFactor):
-						datagram.QualityFactor[idx] = 0
+						datagram.QualityFactor[idx] = 255
 						# datagram.Depth[idx] += 100
 					bytes = datagram.encode()
 					outFilePtr.write(bytes)
+					# test to figure out how caris rejects records
+					dwrite += 1
+					if dwrite == 5:
+						break
 					continue
 					# test by rejecting all f records as well...
 				if TypeOfDatagram == 'f':
 					datagram.read()
 					for idx, val in enumerate(datagram.QualityFactor):
-						datagram.QualityFactor[idx] = 0
+						datagram.QualityFactor[idx] = 255
 					# for idx, val in enumerate(datagram.TwoWayTravelTime):
 					# 	if idx > 113 and idx < 126:
 					# 		datagram.TwoWayTravelTime[idx] *= 0.90
@@ -603,7 +618,7 @@ def main():
 				if TypeOfDatagram == 'O':
 					datagram.read()
 					for idx, val in enumerate(datagram.QualityFactor):
-						datagram.QualityFactor[idx] = 0
+						datagram.QualityFactor[idx] = 255
 					bytes = datagram.encode()
 					outFilePtr.write(bytes)
 					continue
@@ -1348,13 +1363,6 @@ class SRHReader:
 		except struct.error:
 			print ("Exception loading SRH file.  Will process as much as can be read")
 
-	# def swap32(self, i):
-	#	 return struct.unpack("<I", struct.pack(">I", i))[0]
-	# def swap16(self, i):
-	#	 return struct.unpack("<H", struct.pack(">H", i))[0]
-
-# def swap32(self, x):
-#		 return int.from_bytes(x.to_bytes(4, byteorder='little'), byteorder='big', signed=False)
 ###############################################################################
 if __name__ == "__main__":
 	start_time = time.time() # time  the process

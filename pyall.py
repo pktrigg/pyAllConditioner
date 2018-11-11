@@ -211,13 +211,19 @@ class ALLReader:
 	def getRecordCount(self):
 		'''read through the entire file as fast as possible to get a count of all records.  useful for progress bars so user can see what is happening'''
 		count = 0
+		start = 0
+		end = 0
+		self.rewind()
+		numberOfBytes, STX, typeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
+		start = to_timestamp(to_DateTime(RecordDate, RecordTime))
 		self.rewind()
 		while self.moreData():
 			numberOfBytes, STX, typeOfDatagram, EMModel, RecordDate, RecordTime = self.readDatagramHeader()
 			self.fileptr.seek(numberOfBytes, 1)
 			count += 1
-		self.rewind()		
-		return count
+		self.rewind()
+		end = to_timestamp(to_DateTime(RecordDate, RecordTime))
+		return count, start, end
 
 	def readDatagram(self):
 		'''read the datagram header.  This permits us to skip datagrams we do not support'''
