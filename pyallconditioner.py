@@ -617,29 +617,29 @@ def main():
 
 			# before we write the datagram out, we need to inject records with a smaller from_timestamp
 			if injectAttitude:
-				if TypeOfDatagram in args.exclude:
-					# dont trigger on records we are rejecting!
-					continue
 				if args.injectAFileName.lower().endswith('.srh'):
 					counter, lastHeightTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
 				if args.injectAFileName.lower().endswith('.txt'):
 					counter, lastHeightTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), ATTSubset, counter)
-
-			if injectAttitudeHeight:
 				if TypeOfDatagram in args.exclude:
 					# dont trigger on records we are rejecting!
 					continue
+
+			if injectAttitudeHeight:
 				if args.injectAHFileName.lower().endswith('.txt'):
 					counter, lastPositionTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), TypeOfDatagram, ATTSubset, counter, True, lastHeightTimeStamp)
 					# continue
-
-			if injectPosition:
 				if TypeOfDatagram in args.exclude:
 					# dont trigger on records we are rejecting!
 					continue
+
+			if injectPosition:
 				if args.injectPOSITIONFileName.lower().endswith('.txt'):
 					counter, lastPositionTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), TypeOfDatagram, POSSubset, counter, True, lastPositionTimeStamp)
 					# continue
+				if TypeOfDatagram in args.exclude:
+					# dont trigger on records we are rejecting!
+					continue
 
 			if extractBackscatter:
 				'''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
