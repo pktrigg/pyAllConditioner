@@ -57,7 +57,7 @@ def main():
 	parser.add_argument('-wobble', dest='wobble', action='store_true', default=False, help='compute the heave and roll related wobble from the raw observations for QC purposes')
 	parser.add_argument('-beamqc', dest='beamqc', action='store_true', default=False, help='for QC purposes compute a best fit line through each ping and the delta Z for each beam, then compute the mean deviation. Identify noisy beams.')
 	parser.add_argument('-testfwrite', dest='testfwrite', action='store_true', default=False, help='test the encoding of f records.')
-	parser.add_argument('-testdwrite', dest='testdwrite', action='store_true', default=True, help='test the encoding of D records.')
+	parser.add_argument('-testdwrite', dest='testdwrite', action='store_true', default=False, help='test the encoding of D records.')
 
 	if len(sys.argv)==1:
 		parser.print_help()
