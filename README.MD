@@ -20,6 +20,8 @@ implement -splitduration
 
 Done
 ====
+improve options naming convention
+added support for splitting file based on central frequency.  This is handy if the user has changed settings mid line and backscatter processing is affected.  Conditioned Filename has central frequency inserted into filename.
 added support for the injection of P records, reading an ASCII file which may have been edited to improve the quality of navigation.
 added support for the extraction of the P record from a file to ASCII
 added support for reading ASCII position records (which may have been improved in another application) and injecting into a new .all file

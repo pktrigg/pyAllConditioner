@@ -306,18 +306,17 @@ class ALLReader:
 		return installStart, installStop, initialMode
 
 ###############################################################################
-	def loadInitialFrequency(self):
+	def loadCenterFrequency(self):
 		'''determine the central frequency of the first record in the file'''
-		initialFrequency = None
 		self.rewind()
 		while self.moreData():
 			typeOfDatagram, datagram = self.readDatagram()
 			if (typeOfDatagram == 'N'):
 				datagram.read()
-				initialFrequency = datagram.CentreFrequency
+				centerFrequency = datagram.CentreFrequency[0]
 				break
 		self.rewind()
-		return initialFrequency
+		return centerFrequency
 ###############################################################################
 	def loadNavigation(self, firstRecordOnly=False):
 		'''loads all the navigation into lists'''

@@ -8,7 +8,7 @@
 			"stopOnEntry": false,
 			"program": "${file}",
 			"pythonPath": "python.exe",
-			"args": ["-i", "C:/development/python/sample.all", "-position", "-i", "C:/development/python/norm/0005_20140323_054018.all"]
+			"args": ["-i", "C:/development/python/sample.all", "-extractbscorr", "-i", "C:/development/python/norm/0005_20140323_054018.all"]
 		}
 	]
 }

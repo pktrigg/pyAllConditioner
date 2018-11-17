@@ -37,24 +37,24 @@ def main():
 	parser.add_argument('-odir', dest='odir', action='store', default="", help='Specify a relative output folder e.g. -odir conditioned')
 	parser.add_argument('-odix', dest='odix', action='store', default="_conditioned", help='Specify an output filename appendage e.g. -odix _savgol')
 	parser.add_argument('-exclude', dest='exclude', action='store', default="", help='Exclude these datagrams.  Note: this needs to be case sensitive e.g. -exclude PYNn')
+	parser.add_argument('-extractposition', action='store_true', default=False, dest='extractposition', help='Extract a CSV file of "P" POSITION datagrams.  [Default: False]')
+	parser.add_argument('-extractattitude', action='store_true', default=False, dest='extractattitude', help='Extract a CSV file of "A" ATTITUDE.  [Default: False]')
+	parser.add_argument('-extractattitudeheight', action='store_true', default=False, dest='extractattitudeheight', help='Extract a CSV file of the COMBINED "A" ATTITUDE and "h" HEIGHT.  [Default: False]')
+	parser.add_argument('-extractheight', action='store_true', default=False, dest='extractheight', help='Extract a CSV file of "h" HEIGHT datagrams.  [Default: False]')
+	parser.add_argument('-extractnadir', action='store_true', default=False, dest='extractnadir', help='Extract a CSV file of the nadir beam.  [Default: False]')
+	parser.add_argument('-extractbackscatter', action='store_true', default=False, dest='extractbackscatter', help='Extract backscatter from Y datagram so we can analyse. [Default: False]')
+	parser.add_argument('-extractsvp', action='store_true', default=False, dest='extractsvp', help='Extract a CARIS compatible SVP file based on the sound velocity datagram.  [Default: False]')
+	parser.add_argument('-extractclock', action='store_true', default=False, dest='extractclock', help='Extract a CSV file containing the clock datagrams. Very usefulfor QC of timing subsystem .  [Default: False]')
+	parser.add_argument('-extractinstall', action='store_true', default=False, dest='extractinstall', help='Output the installation parameters to a CSV. [Default: False]')
+	parser.add_argument('-extractruntime', action='store_true', default=False, dest='extractruntime', help='extract the runtime records for QC purposes')
+	parser.add_argument('-extractbscorr', action='store_true', default=False, dest='extractbscorr', help='Extract the backscatter bscorr.txt file as used in the PU.  This is useful for backscatter calibration and processing, and removes the need to telnet into the PU.   [Default: False]')
 	parser.add_argument('-injectA', dest='injectAFileName', action='store', default="", help='Inject this ATTITUDE file as "A" datagrams. e.g. -injectA "*.srh|*.txt" (Hint: remember the quotes!)')
 	parser.add_argument('-injectAH', dest='injectAHFileName', action='store', default="", help='Inject this ATTIDUE+HEIGHT file as "A" and "H" datagrams. e.g. -injectAH "*.txt" (Hint: remember the quotes!)')
 	parser.add_argument('-injectP', dest='injectPOSITIONFileName', action='store', default="", help='Inject this POSITION file as "P" datagrams. e.g. -inject myposition.txt or -injectP "*.txt" (Hint: remember the quotes for wildcard!)')
-	parser.add_argument('-conditionbs', dest='conditionbs', action='store', default="", help='Improve the Y_SeabedImage datagrams by adding a CSV correction file. eg. -conditionbs c:/angularResponse.csv')
-	parser.add_argument('-extractbs', action='store_true', default=False, dest='extractbs', help='Extract backscatter from Y datagram so we can analyse. [Default: False]')
-	parser.add_argument('-nadir', action='store_true', default=False, dest='nadir', help='Output a CSV file of the nadir beam.  [Default: False]')
-	parser.add_argument('-bscorr', action='store_true', default=False, dest='bscorr', help='Output the backscatter bscorr.txt file as used in the PU.  This is useful for backscatter calibration and processing, and removes the need to telnet into the PU.   [Default: False]')
+	parser.add_argument('-injectbscorr', dest='injectbscorr', action='store', default="", help='Apply a correction to the Y_SeabedImage datagrams by adding a CSV correction file as createed with the -extractbscorr option. eg. -injectbscorr c:/angularResponse.csv')
 	parser.add_argument('-splitd', action='store_true', default=False, dest='splitd', help='split the .all file every time the depth mode changes.  [Default: False]')
 	parser.add_argument('-splitf', action='store_true', default=False, dest='splitf', help='split the .all file every time the central frequency changes.  [Default: False]')
 	parser.add_argument('-splitt', dest='splitt', action='store', default="", help='Split the .all file based on time in seconds e.g. -splitt 60')
-	parser.add_argument('-attitude', action='store_true', default=False, dest='attitude', help='Output a CSV file of "A" ATTITUDE.  [Default: False]')
-	parser.add_argument('-attitudeHeight', action='store_true', default=False, dest='attitudeHeight', help='Output a CSV file of the COMBINED "A" ATTITUDE and "h" HEIGHT.  [Default: False]')
-	parser.add_argument('-clock', action='store_true', default=False, dest='clock', help='Output a CSV file containing the clock datagrams. Very usefulfor QC of timing subsystem .  [Default: False]')
-	parser.add_argument('-height', action='store_true', default=False, dest='height', help='Output a CSV file of "h" HEIGHT datagrams.  [Default: False]')
-	parser.add_argument('-position', action='store_true', default=False, dest='position', help='Output a CSV file of "P" POSITION datagrams.  [Default: False]')
-	parser.add_argument('-svp', action='store_true', default=False, dest='svp', help='Output a CARIS compatible SVP file based on the sound velocity datagram.  [Default: False]')
-	parser.add_argument('-install', action='store_true', default=False, dest='install', help='Output the installation parameters to a CSV. [Default: False]')
-	parser.add_argument('-runtime', dest='runtime', action='store_true', default=False, help='dump the runtime records for QC purposes')
 	parser.add_argument('-wobble', dest='wobble', action='store_true', default=False, help='compute the heave and roll related wobble from the raw observations for QC purposes')
 	parser.add_argument('-beamqc', dest='beamqc', action='store_true', default=False, help='for QC purposes compute a best fit line through each ping and the delta Z for each beam, then compute the mean deviation. Identify noisy beams.')
 	parser.add_argument('-testfwrite', dest='testfwrite', action='store_true', default=False, help='test the encoding of f records.')
@@ -68,25 +68,9 @@ def main():
 
 	fileCounter=0
 	matches				= []
-	injectAttitude		= False
-	injectAttitudeHeight= False
-	injectPosition		= False
-	extractAttitude		= False
-	extractAttitudeHeight	= False
-	extractHeight		= False
-	extractPosition		= False
-	extractNadir		= False
-	extractBackscatter	= False
-	extractSVP			= False
-	extractClock		= False
-	conditionBS			= False
-	extractBSCorr		= False
-	extractInstall		= False
-	extractRuntime		= False
 	correctBackscatter 	= False
 	writeConditionedFile= True
 	splitd				= False
-	splitf				= False
 	splitfileend		= 0
 	splitt				= 0
 	latitude			= 0
@@ -95,18 +79,19 @@ def main():
 	beamQC 				= False
 	testfwrite			= False
 	testdwrite			= False
+	centerFrequency 	= 0
+	outFilePtr 			= None
+
 	if args.recursive:
 		for root, dirnames, filenames in os.walk(os.path.dirname(args.inputFile)):
 			for f in fnmatch.filter(filenames, '*.all'):
 				matches.append(os.path.join(root, f))
-				# print (matches[-1])
 	else:
 		if os.path.exists(args.inputFile):
 			matches.append (os.path.abspath(args.inputFile))
 		else:
 			for filename in glob(args.inputFile):
 				matches.append(filename)
-		# print (matches)
 
 	if len(matches) == 0:
 		print ("No files found in %s to process, quitting" % args.inputFile)
@@ -130,14 +115,12 @@ def main():
 		writeConditionedFile = True # we dont need to write a conditioned .all file
 		dwrite = 0
 
-	if len(args.conditionbs) > 0:
+	if len(args.injectbscorr) > 0:
 		beamPointingAngles = []
-		ARC = loadARC(args.conditionbs)
-		conditionBS = True
+		ARC = loadARC(args.injectbscorr)
 		args.exclude = 'Y' # we need to NOT write out the original data as we will be creating new records
 
-	if args.extractbs:
-		extractBackscatter = True
+	if args.extractbackscatter:
 		writeConditionedFile= False #we do not need to write out a .all file
 		# we need a generic set of beams into which we can insert individual ping data.  Thhis will be the angular respnse curve
 		beamdetail = [0,0,0,0]
@@ -145,13 +128,11 @@ def main():
 		ARC = [pyall.cBeam(beamdetail, i) for i in range(startAngle, -startAngle)]
 		beamPointingAngles = []
 		transmitSector = []
-		writeConditionedFile = False # we dont need to write a conditioned .all file
 		outFileName = os.path.join(os.path.dirname(os.path.abspath(matches[0])), args.odir, "AngularResponseCurve.csv")
 		outFileName = createOutputFileName(outFileName)
 
 	# the user has specified a file for injection, so load it into a dictionary so we inject them into the correct spot in the file
-	if len(args.injectAFileName) > 0:
-		injectAttitude = True
+	if args.injectAFileName:
 		print ("Injector will inject system 1 'A' records as an active attitude data sensor with pitch,roll,heave and heading data. You may well need to also use the -exclude A to remove the existing records so the .all file is not conflicted")
 		if args.injectAFileName.lower().endswith('.srh'):
 			SRH = SRHReader()
@@ -164,8 +145,7 @@ def main():
 		else:
 			print ("Injecting POSMV True Heave Data...")
 
-	if len(args.injectAHFileName) > 0:
-		injectAttitudeHeight = True
+	if args.injectAHFileName:
 		print ("Injector will inject system 1 'A' attitude records as an active attitude data sensor with pitch,roll,heave and heading data. You may well need to also use the -exclude A to remove the existing records so the .all file is not conflicted")
 		print ("Injector will inject 'h' height records GPS height from atttitde CSV file You may well need to also use the -exclude h to remove the existing records so the .all file is not conflicted")
 		if args.injectAHFileName.lower().endswith('.txt'):
@@ -175,8 +155,7 @@ def main():
 		# auto exclude attitude records.  on reflection, we should probably NOT do this.
 		# args.exclude = 'n'
 
-	if len(args.injectPOSITIONFileName) > 0:
-		injectPosition = True
+	if args.injectPOSITIONFileName:
 		print ("Injector will inject system 1 'P' attitude records as an active attitude data sensor with latitude, longitude data. You may well need to also use the -exclude P to remove the existing records so the .all file is not conflicted")
 		if args.injectPOSITIONFileName.lower().endswith('.txt'):
 			POS = POSITIONReader()
@@ -185,8 +164,7 @@ def main():
 		# auto exclude attitude records.  on reflection, we should probably NOT do this.
 		# args.exclude = 'n'
 
-	if args.install:
-		extractInstall=True
+	if args.extractinstall:
 		writeConditionedFile= False #we do not need to write out a .all file
 		r = pyall.ALLReader(matches[0])
 		installStart, installStop, initialMode, datagram = r.loadInstallationRecords()
@@ -198,51 +176,32 @@ def main():
 			header = header + "," + InstallationCodeToText(code) + " (" + code + ")"
 		print (header)
 
-	if args.runtime:
-		extractRuntime=True
+	if args.extractruntime:
 		writeConditionedFile= False #we do not need to write out a .all file
-		# find the first record so we can print the header from the datagram class
-		r = pyall.ALLReader(matches[0])
-		while r.moreData():
-			typeOfDatagram, datagram = r.readDatagram()
-			if typeOfDatagram == 'R':
-				datagram.read()
-				print("filename," + datagram.header())
-				break
-		r.close()
 
-	if args.clock:
-		extractClock=True
+	if args.extractclock:
 		timestamps=[]
 		writeConditionedFile= False #we do not need to write out a .all file
-		print("RecordDate,ExternalDate,RecordTime,ExternalTime,Difference,PPSInUse")
 
-	if args.attitude:
-		extractAttitude=True
+	if args.extractattitude:
 		writeConditionedFile= False #we do not need to write out a .all file
 
-	if args.height:
-		extractHeight=True
+	if args.extractheight:
 		writeConditionedFile= False #we do not need to write out a .all file
 
-	if args.position:
-		extractPosition=True
+	if args.extractposition:
 		writeConditionedFile= False #we do not need to write out a .all file
 
-	if args.attitudeHeight:
-		extractAttitudeHeight=True
+	if args.extractattitudeheight:
 		writeConditionedFile= False #we do not need to write out a .all file
 
-	if args.nadir:
-		extractNadir=True
+	if args.extractnadir:
 		writeConditionedFile= False #we do not need to write out a .all file
 
-	if args.bscorr:
-		extractBSCorr=True
+	if args.extractbscorr:
 		writeConditionedFile= False #we do not need to write out a .all file
 
-	if args.svp:
-		extractSVP=True
+	if args.extractsvp:
 		writeConditionedFile= False #we do not need to write out a .all file
 
 	if args.splitd:
@@ -250,8 +209,7 @@ def main():
 		initialDepthMode = ""
 
 	if args.splitf:
-		splitf=True
-		initialFrequency = 0
+		centerFrequency = 0
 
 	if args.beamqc:
 		beamQC=True
@@ -275,14 +233,33 @@ def main():
 		attitudeData = []
 # #################################################################################
 	for filename in matches:
-		if injectAttitude:
+		if args.injectAFileName:
 			# find out the first and last timestamps in the .all file
 			r = pyall.ALLReader(filename)
 			count, start, end = r.getRecordCount()
 			# load the heave data from the posmv files
 			POSMVRead.loadData(args.injectAFileName, start, end)
 			r.close()
-		if extractAttitude:
+
+		if args.extractruntime:
+			# create an output file based on the input
+			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+			outFileName = os.path.splitext(outFileName)[0]+'_RUNTIME.txt'
+			# outFileName  = addFileNameAppendage(outFileName, args.odix)
+			outFileName  = createOutputFileName(outFileName)
+			outRuntimeFilePtr = open(outFileName, 'w')
+			print ("writing RUNTIME to file: %s" % outFileName)
+
+		if args.extractnadir:
+			# create an output file based on the input
+			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+			outFileName = os.path.splitext(outFileName)[0]+'_NADIR.txt'
+			# outFileName  = addFileNameAppendage(outFileName, args.odix)
+			outFileName  = createOutputFileName(outFileName)
+			outNadirFilePtr = open(outFileName, 'w')
+			print ("writing NADIR to file: %s" % outFileName)
+
+		if args.extractattitude:
 			# create an output file based on the input
 			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
 			outFileName = os.path.splitext(outFileName)[0]+'_ATTITUDE.txt'
@@ -290,8 +267,16 @@ def main():
 			outFileName  = createOutputFileName(outFileName)
 			outAttitudeFilePtr = open(outFileName, 'w')
 			print ("writing ATTITUDE to file: %s" % outFileName)
+		if args.extractclock:
+			# create an output file based on the input
+			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+			outFileName = os.path.splitext(outFileName)[0]+'_CLOCK.txt'
+			# outFileName  = addFileNameAppendage(outFileName, args.odix)
+			outFileName  = createOutputFileName(outFileName)
+			outClockFilePtr = open(outFileName, 'w')
+			print ("writing CLOCK to file: %s" % outFileName)
 
-		if extractHeight:
+		if args.extractheight:
 			# create an output file based on the input
 			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
 			outFileName = os.path.splitext(outFileName)[0]+'_HEIGHT.txt'
@@ -300,7 +285,7 @@ def main():
 			outHeightFilePtr = open(outFileName, 'w')
 			print ("writing HEIGHT to file: %s" % outFileName)
 
-		if extractPosition:
+		if args.extractposition:
 			# create an output file based on the input
 			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
 			outFileName = os.path.splitext(outFileName)[0]+'_POSITION.txt'
@@ -309,7 +294,7 @@ def main():
 			outPositionFilePtr = open(outFileName, 'w')
 			print ("writing POSITION to file: %s" % outFileName)
 
-		if extractAttitudeHeight:
+		if args.extractattitudeheight:
 			# create an output file based on the input
 			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
 			outFileName = os.path.splitext(outFileName)[0]+'_ATTITUDEHEIGHT.txt'
@@ -320,53 +305,64 @@ def main():
 			attitudeData = []
 			heightData = []
 
-		if writeConditionedFile:
-			# create an output file based on the input
-			outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
-			outFileName  = addFileNameAppendage(outFileName, args.odix)
-			outFileName  = createOutputFileName(outFileName)
-			outFilePtr = open(outFileName, 'wb')
-			print ("writing to conditioned file: %s" % outFileName)
+		# if writeConditionedFile:
+		# 	# create an output file based on the input
+		# 	outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+		# 	outFileName  = addFileNameAppendage(outFileName, args.odix)
+		# 	outFileName  = createOutputFileName(outFileName)
+		# 	outFilePtr = open(outFileName, 'wb')
+		# 	print ("writing to conditioned file: %s" % outFileName)
 
 		# open the file and do some initialisation stuff
 		r = pyall.ALLReader(filename)
 		counter = 0
 
-		if extractNadir:
-			print ("NadirDepth,TxDepth,Roll,Pitch,Heave,Heading ")
+		if args.extractruntime:
+			s = "Runtime"
+			run = pyall.R_RUNTIME(outRuntimeFilePtr, 0)
+			s = run.header()
+			outRuntimeFilePtr.write(s + "\n")
 
-		if extractAttitude:
+		if args.extractclock:
+			s = "RecordDate,ExternalDate,RecordTime,ExternalTime,Difference,PPSInUse"
+			outClockFilePtr.write(s + "\n")
+
+		if args.extractattitude:
 			# read the first record so we get a date for the file header
 			typeOfDatagram, datagram = r.readDatagram()
-			str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Roll, Pitch, Heave, Heading"
-			outAttitudeFilePtr.write("Name:" + os.path.basename(filename) + "," + str + "\n")
+			s = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Roll, Pitch, Heave, Heading"
+			outAttitudeFilePtr.write(s + "\n")
 
-		if extractHeight:
+		if args.extractheight:
 			# read the first record so we get a date for the file header
 			typeOfDatagram, datagram = r.readDatagram()
-			str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Height"
-			outHeightFilePtr.write("Name:" + os.path.basename(filename) + "," + str + "\n")
+			s = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Height"
+			outHeightFilePtr.write(s + "\n")
 
-		if extractPosition:
+		if args.extractnadir:
 			# read the first record so we get a date for the file header
 			typeOfDatagram, datagram = r.readDatagram()
-			str = "Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
-			# str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
-			outPositionFilePtr.write(str + "\n")
+			s = "NadirDepth, TransducerDepth, currentRoll, currentPitch, currentHeave, currentHeading"
+			outNadirFilePtr.write(s + "\n")
 
-		if extractAttitudeHeight:
+		if args.extractposition:
 			# read the first record so we get a date for the file header
 			typeOfDatagram, datagram = r.readDatagram()
-			str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Roll, Pitch, Heave, Heading, Height"
-			outAttitudeHeightFilePtr.write("Name:" + os.path.basename(filename) + "," + str + "\n")
+			s = "Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
+			# s = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
+			outPositionFilePtr.write(s + "\n")
 
-		if splitd or splitf or splitt>0:
+		if args.extractattitudeheight:
+			# read the first record so we get a date for the file header
+			typeOfDatagram, datagram = r.readDatagram()
+			s = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Roll, Pitch, Heave, Heading, Height"
+			outAttitudeHeightFilePtr.write(s + "\n")
+
+		if splitd or args.splitf or splitt>0:
 			InstallStart, InstallEnd, initialDepthMode = r.loadInstallationRecords()
+			centerFrequency = r.loadCenterFrequency()
 
-			# initialFrequency = r.loadInitialFrequency()
-
-
-		if injectAttitude:
+		if args.injectAFileName:
 			TypeOfDatagram, datagram = r.readDatagram()
 			if args.injectAFileName.lower().endswith('.srh'):
 				# kill off the leading records so we do not swamp the filewith unwanted records
@@ -378,7 +374,7 @@ def main():
 				ATTSubset = deque(ATT.ATTData)
 				ATTSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), ATTSubset)
 				r.rewind()
-		if injectAttitudeHeight:
+		if args.injectAHFileName:
 			TypeOfDatagram, datagram = r.readDatagram()
 			if args.injectAHFileName.lower().endswith('.txt'):
 				# kill off the leading records so we do not swamp the filewith unwanted records
@@ -386,7 +382,7 @@ def main():
 				ATTSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), ATTSubset)
 				r.rewind()
 				lastHeightTimeStamp = 0
-		if injectPosition:
+		if args.injectPOSITIONFileName:
 			TypeOfDatagram, datagram = r.readDatagram()
 			if args.injectPOSITIONFileName.lower().endswith('.txt'):
 				# kill off the leading records so we do not swamp the filewith unwanted records
@@ -394,7 +390,7 @@ def main():
 				POSSubset = trimInjectionData(pyall.to_timestamp(r.currentRecordDateTime()), POSSubset)
 				r.rewind()
 				lastPositionTimeStamp = 0
-		if extractSVP:
+		if args.extractsvp:
 			# we need the position of the SVP dip in the SVP file, so use the first position record in the file
 			nav = r.loadNavigation(True)
 			if len(nav) > 0:
@@ -432,7 +428,6 @@ def main():
 					ping.BeamNumber = datagram.BeamNumber
 					# now compute the approximate depth
 					ping.calcDepth()
-
 
 					# compute a best fit line through the ping of data so we can compute the slope and intercept
 					slope, intercept, rvalue, pvalue, stderr = stats.linregress(ping.Dy, ping.Dz)
@@ -496,56 +491,52 @@ def main():
 					for a in datagram.Attitude:
 						dateobject = pyall.to_DateTime(a[0], a[1])
 						# date, time, roll, pitch, heave, heading
-						str = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (a[0],a[1],a[3],a[4],a[5],a[6]))
+						s = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (a[0],a[1],a[3],a[4],a[5],a[6]))
 						ts = pyall.to_timestamp(pyall.to_DateTime(a[0], a[1]))
 						attitudeData.append([ts, a[3], a[4], a[5], a[6]])
 
-			if extractNadir:
+			if args.extractnadir:
 				if TypeOfDatagram == 'D' or  TypeOfDatagram == 'X':
 					datagram.read()
 					# find the depth nearest to Nadir
 					# https://stackoverflow.com/questions/9706041/finding-index-of-an-item-closest-to-the-value-in-a-list-thats-not-entirely-sort
 					nadirBeam = min(range(len(datagram.AcrossTrackDistance)), key=lambda i: abs(datagram.AcrossTrackDistance[i]))
-					print ("%.3f,%.3f,%.3f,%.3f,%.3f" % (datagram.Depth[nadirBeam], datagram.TransducerDepth/100, currRoll, currPitch, currHeave, currHeading))
+					s = "%.3f,%.3f,%.3f,%.3f,%.3f, %.3f\n" % (datagram.Depth[nadirBeam], datagram.TransducerDepth/100, currRoll, currPitch, currHeave, currHeading)
+					outNadirFilePtr.write(s)
 
-				# if TypeOfDatagram == 'A':
-				# 	datagram.read()
-				# 	currRoll = datagram.Attitude[-1][3]
-				# 	currPitch = datagram.Attitude[-1][4]
-				# 	currHeave = datagram.Attitude[-1][5]
-				# 	currHeading = datagram.Attitude[-1][6]
-
-			if extractClock:
+			if args.extractclock:
 				if TypeOfDatagram == 'C':
 					datagram.read()
-					print (datagram)
+					# print (datagram)
+					outClockFilePtr.write(str(datagram) + "\n")
 					timestamps.append(datagram.time-datagram.ExternalTime)
-			if extractAttitude:
+
+			if args.extractattitude:
 				if TypeOfDatagram == 'A':
 					datagram.read()
 					for a in datagram.Attitude:
 						ts = pyall.to_timestamp(pyall.to_DateTime(a[0], a[1])) #remember to add the millisecs for each sub record!
 						# timetamp, roll, pitch, heave, heading
-						str = ("%.3f,%.3f,%.3f,%.3f,%.3f\n" % (ts,a[3],a[4],a[5],a[6]))
-						outAttitudeFilePtr.write(str)
+						s = ("%.3f,%.3f,%.3f,%.3f,%.3f\n" % (ts,a[3],a[4],a[5],a[6]))
+						outAttitudeFilePtr.write(s)
 
-			if extractHeight:
+			if args.extractheight:
 				if TypeOfDatagram == 'h':
 					datagram.read()
 					# dateobject = pyall.to_DateTime(a[0], a[1])
 					# date, time, height
 					ts = pyall.to_timestamp(pyall.to_DateTime(datagram.RecordDate, datagram.Time))
-					str = ("%.3f,%.3f\n" % (ts, datagram.Height))
-					# str = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (datagram.RecordDate, datagram.Time, datagram.Height, datagram.Height, datagram.Height, datagram.Height))
-					outHeightFilePtr.write(str)
+					s = ("%.3f,%.3f\n" % (ts, datagram.Height))
+					# s = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (datagram.RecordDate, datagram.Time, datagram.Height, datagram.Height, datagram.Height, datagram.Height))
+					outHeightFilePtr.write(s)
 
-			if extractPosition:
+			if args.extractposition:
 				if TypeOfDatagram == 'P':
 					datagram.read()
 					# dateobject = pyall.to_DateTime(a[0], a[1])
 					# date, time, height
 					ts = pyall.to_timestamp(pyall.to_DateTime(datagram.RecordDate, datagram.Time))
-					str = ("%.3f,%d,%.7f,%.7f,%.3f,%.3f,%.3f,%.3f,%d,%d,%s\n" % (ts, datagram.Counter,
+					s = ("%.3f,%d,%.7f,%.7f,%.3f,%.3f,%.3f,%.3f,%d,%d,%s\n" % (ts, datagram.Counter,
 						datagram.Latitude,
 						datagram.Longitude,
 						datagram.Quality,
@@ -555,10 +546,10 @@ def main():
 						datagram.Descriptor,
 						datagram.NBytesDatagram,
 						datagram.data.decode("utf-8").replace('\x00', '')))
-					# str = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (datagram.RecordDate, datagram.Time, datagram.Height, datagram.Height, datagram.Height, datagram.Height))
-					outPositionFilePtr.write(str)
+					# s = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (datagram.RecordDate, datagram.Time, datagram.Height, datagram.Height, datagram.Height, datagram.Height))
+					outPositionFilePtr.write(s)
 
-			if extractAttitudeHeight:
+			if args.extractattitudeheight:
 				if TypeOfDatagram == 'A':
 					datagram.read()
 					for a in datagram.Attitude:
@@ -571,7 +562,7 @@ def main():
 					ts = pyall.to_timestamp(pyall.to_DateTime(datagram.RecordDate, datagram.Time))
 					heightData.append([ts, datagram.Height])
 
-			if extractInstall:
+			if args.extractinstall:
 				if TypeOfDatagram == 'I':
 					datagram.read()
 					row = filename
@@ -582,12 +573,15 @@ def main():
 						# row.replace(",,",",")
 					print (row)
 					# break
-			if extractRuntime:
+
+			if args.extractruntime:
 				if TypeOfDatagram == 'R':
 					datagram.read()
-					if currRuntime != datagram.parameters():
-						print (filename, "," ,datagram)
-						currRuntime = datagram.parameters()
+					# if currRuntime != datagram.parameters():
+						# print (filename, "," ,datagram)
+					outRuntimeFilePtr.write(str(datagram) + "\n")
+
+						# currRuntime = datagram.parameters()
 					# break
 			if splitt:
 					# datagram.read()
@@ -623,27 +617,27 @@ def main():
 						outFilePtr.write(rawBytes)
 						initialDepthMode = datagram.DepthMode #remember the new depth mode!
 
-			if splitf:
+			if args.splitf:
 				if TypeOfDatagram == 'N':
 					datagram.read()
-					if initialFrequency != datagram.CentreFrequency:
+					if centerFrequency != datagram.CentreFrequency[0]:
 						# write out the closing install record then close the file
 						print ("closing the file as the frequency has changed")
 						outFilePtr.write(InstallEnd)
 						outFilePtr.close()
 
-						outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.splitext(filename)[0] + "_" + str(datagram.CentreFrequency) + "." + os.path.splitext(filename)[1],)
+						outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+						outFileName  = addFileNameAppendage(outFileName, "_" + str(datagram.CentreFrequency[0]))
 						outFileName  = addFileNameAppendage(outFileName, args.odix)
 						outFileName  = createOutputFileName(outFileName)
 						outFilePtr = open(outFileName, 'wb')
 						print ("writing to split file: %s" % outFileName)
 						outFilePtr.write(InstallStart)
 						outFilePtr.write(rawBytes)
-						initialFrequency = datagram.CentreFrequency #remember the new centre frequency
-
+						centerFrequency = datagram.CentreFrequency #remember the new centre frequency
 
 			# before we write the datagram out, we need to inject records with a smaller from_timestamp
-			if injectAttitude:
+			if args.injectAFileName:
 				if args.injectAFileName.lower().endswith('.srh'):
 					counter, lastHeightTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), SRHSubset, counter)
 				if args.injectAFileName.lower().endswith('.txt'):
@@ -652,7 +646,7 @@ def main():
 					# dont trigger on records we are rejecting!
 					continue
 
-			if injectAttitudeHeight:
+			if args.injectAHFileName:
 				if args.injectAHFileName.lower().endswith('.txt'):
 					counter, lastPositionTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), TypeOfDatagram, ATTSubset, counter, True, lastHeightTimeStamp)
 					# continue
@@ -660,7 +654,7 @@ def main():
 					# dont trigger on records we are rejecting!
 					continue
 
-			if injectPosition:
+			if args.injectPOSITIONFileName:
 				if args.injectPOSITIONFileName.lower().endswith('.txt'):
 					counter, lastPositionTimeStamp = injector(outFilePtr, pyall.to_timestamp(r.currentRecordDateTime()), TypeOfDatagram, POSSubset, counter, True, lastPositionTimeStamp)
 					# continue
@@ -668,7 +662,7 @@ def main():
 					# dont trigger on records we are rejecting!
 					continue
 
-			if extractBackscatter:
+			if args.extractbackscatter:
 				'''to extract backscatter angular response curve we need to keep a count and sum of all samples in a per degree sector'''
 				'''to do this, we need to take into account the take off angle of each beam'''
 				if TypeOfDatagram == 'N':
@@ -728,7 +722,7 @@ def main():
 					outFilePtr.write(bytes)
 					continue
 
-			if conditionBS:
+			if args.injectbscorr:
 				if TypeOfDatagram == 'N':
 					datagram.read()
 					beamPointingAngles = datagram.BeamPointingAngle
@@ -742,11 +736,11 @@ def main():
 					outFilePtr.write(bytes)
 					continue
 
-			if extractSVP:
+			if args.extractsvp:
 				extractProfile(datagram, TypeOfDatagram, r.currentRecordDateTime(), latitude, longitude, filename, args.odir)
 				continue
 
-			if extractBSCorr:
+			if args.extractbscorr:
 				extractBSCorrData(datagram, TypeOfDatagram, filename, args.odir)
 				continue
 
@@ -755,6 +749,18 @@ def main():
 				continue
 
 			if writeConditionedFile:
+				if outFilePtr is None:
+					# create an output file based on the input
+					outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.basename(filename))
+					# we are splitting of frequency, so the filename is a little different.
+					if args.splitf:
+						outFileName  = addFileNameAppendage(outFileName, "_" + str(centerFrequency))
+					outFileName  = addFileNameAppendage(outFileName, args.odix)
+					outFileName  = createOutputFileName(outFileName)
+
+					outFilePtr = open(outFileName, 'wb')
+					print ("writing to conditioned file: %s" % outFileName)
+
 				outFilePtr.write(rawBytes)
 
 			# if r.recordCounter > 1000:
@@ -763,24 +769,27 @@ def main():
 		fileCounter +=1
 		r.close()
 
-		if extractAttitudeHeight:
+		if args.extractattitudeheight:
 			# now we need to merge the heights into the attitude records using a time interpolation
-			ts_height = cTimeSeries(heightData)
-			for rec in attitudeData:
-				height = ts_height.getValueAt(rec[0])
-				# rec.append(height)
-				# now save to the regular file format...
-				# d = pyall.dateToKongsbergDate(from_timestamp(rec[0]))
-				# t = pyall.dateToKongsbergTime(from_timestamp(rec[0]))
-				# str = ("%s,%s,%.3f,%.3f,%.3f,%.3f,%.3f\n" % ( d, t, rec[1], rec[2], rec[3], rec[4], height))
-				str = ("%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (rec[0], rec[1], rec[2], rec[3], rec[4], height))
-				outAttitudeHeightFilePtr.write(str)
+			if len(heightData) == 0:
+				print("Sorry, no height data to extract.  Please try extracting attitude data instead")
+			else:
+				ts_height = cTimeSeries(heightData)
+				for rec in attitudeData:
+					height = ts_height.getValueAt(rec[0])
+					# rec.append(height)
+					# now save to the regular file format...
+					# d = pyall.dateToKongsbergDate(from_timestamp(rec[0]))
+					# t = pyall.dateToKongsbergTime(from_timestamp(rec[0]))
+					# s = ("%s,%s,%.3f,%.3f,%.3f,%.3f,%.3f\n" % ( d, t, rec[1], rec[2], rec[3], rec[4], height))
+					s = ("%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (rec[0], rec[1], rec[2], rec[3], rec[4], height))
+					outAttitudeHeightFilePtr.write(s)
 
 		if writeConditionedFile:
 			print ("Saving conditioned file to: %s" % outFileName)
 			outFilePtr.close()
 
-		if extractClock:
+		if args.extractclock:
 			plt.figure(figsize=(12,4))
 			# plt.axhline(0, color='black', linewidth=0.3)
 			plt.grid(linestyle='-', linewidth='0.2', color='black')
@@ -798,7 +807,7 @@ def main():
 			timestamps.clear()
 
 		# print out the extracted backscatter angular response curve
-		if extractBackscatter:
+		if args.extractbackscatter:
 			print("Writing backscatter angular response curve to: %s" % outFileName)
 
 			# compute the mean response across the swath
@@ -900,11 +909,11 @@ def main():
 		names =[]
 		for key, head in heads.items():
 			names.append(head.ID)
-			sum = head.beamSum.values()
+			beamsum = head.beamSum.values()
 			count = head.beamCount.values()
 			beam = head.beamCount.keys()
 			profile = []
-			for s,c in zip(sum, count):
+			for s,c in zip(beamsum, count):
 				profile.append(s/c)
 
 			trace.append(plt.bar(beam, profile))
@@ -1064,16 +1073,16 @@ def InstallationCodeToText(code):
 	return allcodes[code]
 
 ###############################################################################
-def loadARC(conditionbs):
-	if not os.path.exists(conditionbs):
-		print ("oops: backscatter conditioning filename does not exist, please try again: %s" % conditionbs)
+def loadARC(injectbscorr):
+	if not os.path.exists(injectbscorr):
+		print ("oops: backscatter conditioning filename does not exist, please try again: %s" % injectbscorr)
 		exit()
-	ARCList = loadCSVFile(conditionbs)
+	ARCList = loadCSVFile(injectbscorr)
 	ARCList.pop(0)
 	ARC = {}
 	for item in ARCList:
 		ARC[float(item[0])] = float(item[5])
-	print ("Conditioning Y_SeabedImage datagrams with: %s :" % args.conditionbs)
+	print ("Conditioning Y_SeabedImage datagrams with: %s :" % injectbscorr)
 	return ARC
 
 ###############################################################################
