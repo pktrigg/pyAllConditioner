@@ -1425,6 +1425,7 @@ class P_POSITION_ENCODER:
 		typeOfDatagram = 'P'
 		checksum = 0
 		model = 2045 #needs to be a sensible value to record is valid.  Maybe would be better to pass this from above
+		data = "" # for now dont write out the raw position string.  I am not sure if this helps or not.  It can be included if we feel it adds value over confusion
 		# try:
 		# fullDatagram = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType))
 		recordLength =rec_len- 4 + len(data) + 3 # remove 4 bytes from header and add 3 more for footer
@@ -1444,7 +1445,6 @@ class P_POSITION_ENCODER:
 						int(heading * float(100)),
 						int(descriptor),
 						int(len(data)))
-						# int(nBytesDatagram) )
 		# now add the raw bytes, typically NMEA GGA string
 		fullDatagram = fullDatagram + data.encode('ascii')
 		ETX = 3

@@ -20,6 +20,8 @@ implement -splitduration
 
 Done
 ====
+added support for the injection of P records, reading an ASCII file which may have been edited to improve the quality of navigation.
+added support for the extraction of the P record from a file to ASCII
 added support for reading ASCII position records (which may have been improved in another application) and injecting into a new .all file
 added support for extracting P position records to ASCII file
 sort out checksums in encoders.  It now reads fine in sonar viewer
