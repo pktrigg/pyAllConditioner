@@ -20,8 +20,8 @@ import POSMVRead
 import struct
 import numpy as np
 # from bisect import bisect_left, bisect_right
-import sortedcollection
-from operator import itemgetter
+# import sortedcollection
+# from operator import itemgetter
 from collections import deque
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -45,6 +45,7 @@ def main():
 	parser.add_argument('-nadir', action='store_true', default=False, dest='nadir', help='Output a CSV file of the nadir beam.  [Default: False]')
 	parser.add_argument('-bscorr', action='store_true', default=False, dest='bscorr', help='Output the backscatter bscorr.txt file as used in the PU.  This is useful for backscatter calibration and processing, and removes the need to telnet into the PU.   [Default: False]')
 	parser.add_argument('-splitd', action='store_true', default=False, dest='splitd', help='split the .all file every time the depth mode changes.  [Default: False]')
+	parser.add_argument('-splitf', action='store_true', default=False, dest='splitf', help='split the .all file every time the central frequency changes.  [Default: False]')
 	parser.add_argument('-splitt', dest='splitt', action='store', default="", help='Split the .all file based on time in seconds e.g. -splitt 60')
 	parser.add_argument('-attitude', action='store_true', default=False, dest='attitude', help='Output a CSV file of "A" ATTITUDE.  [Default: False]')
 	parser.add_argument('-attitudeHeight', action='store_true', default=False, dest='attitudeHeight', help='Output a CSV file of the COMBINED "A" ATTITUDE and "h" HEIGHT.  [Default: False]')
@@ -85,10 +86,11 @@ def main():
 	correctBackscatter 	= False
 	writeConditionedFile= True
 	splitd				= False
+	splitf				= False
+	splitfileend		= 0
+	splitt				= 0
 	latitude			= 0
 	longitude			= 0
-	splitt				= 0
-	splitfileend		= 0
 	wobble				= False
 	beamQC 				= False
 	testfwrite			= False
@@ -247,6 +249,10 @@ def main():
 		splitd=True
 		initialDepthMode = ""
 
+	if args.splitf:
+		splitf=True
+		initialFrequency = 0
+
 	if args.beamqc:
 		beamQC=True
 		heads = {}
@@ -320,7 +326,7 @@ def main():
 			outFileName  = addFileNameAppendage(outFileName, args.odix)
 			outFileName  = createOutputFileName(outFileName)
 			outFilePtr = open(outFileName, 'wb')
-			print ("writing to file: %s" % outFileName)
+			print ("writing to conditioned file: %s" % outFileName)
 
 		# open the file and do some initialisation stuff
 		r = pyall.ALLReader(filename)
@@ -353,10 +359,11 @@ def main():
 			str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Roll, Pitch, Heave, Heading, Height"
 			outAttitudeHeightFilePtr.write("Name:" + os.path.basename(filename) + "," + str + "\n")
 
-		if splitd:
+		if splitd or splitf or splitt>0:
 			InstallStart, InstallEnd, initialDepthMode = r.loadInstallationRecords()
-		if splitt > 0:
-			InstallStart, InstallEnd, initialDepthMode = r.loadInstallationRecords()
+
+			# initialFrequency = r.loadInitialFrequency()
+
 
 		if injectAttitude:
 			TypeOfDatagram, datagram = r.readDatagram()
@@ -546,7 +553,7 @@ def main():
 						datagram.Heading,
 						datagram.Descriptor,
 						datagram.NBytesDatagram,
-						datagram.data.decode("utf-8")))
+						datagram.data.decode("utf-8").replace('\x00', '')))
 					# str = ("%d,%.3f,%.3f,%.3f,%.3f,%.3f\n" % (datagram.RecordDate, datagram.Time, datagram.Height, datagram.Height, datagram.Height, datagram.Height))
 					outPositionFilePtr.write(str)
 
@@ -614,6 +621,25 @@ def main():
 						outFilePtr.write(InstallStart)
 						outFilePtr.write(rawBytes)
 						initialDepthMode = datagram.DepthMode #remember the new depth mode!
+
+			if splitf:
+				if TypeOfDatagram == 'N':
+					datagram.read()
+					if initialFrequency != datagram.CentreFrequency:
+						# write out the closing install record then close the file
+						print ("closing the file as the frequency has changed")
+						outFilePtr.write(InstallEnd)
+						outFilePtr.close()
+
+						outFileName = os.path.join(os.path.dirname(os.path.abspath(filename)), args.odir, os.path.splitext(filename)[0] + "_" + str(datagram.CentreFrequency) + "." + os.path.splitext(filename)[1],)
+						outFileName  = addFileNameAppendage(outFileName, args.odix)
+						outFileName  = createOutputFileName(outFileName)
+						outFilePtr = open(outFileName, 'wb')
+						print ("writing to split file: %s" % outFileName)
+						outFilePtr.write(InstallStart)
+						outFilePtr.write(rawBytes)
+						initialFrequency = datagram.CentreFrequency #remember the new centre frequency
+
 
 			# before we write the datagram out, we need to inject records with a smaller from_timestamp
 			if injectAttitude:
@@ -1120,18 +1146,15 @@ def injector(outFilePtr, currentRecordTimeStamp, TypeOfDatagram, injectionData, 
 	if TypeOfDatagram == 'P':
 		if len(recordsToAdd) > 0:
 			# counter = counter + 1
-			a = pyall.P_POSITION_ENCODER()
 			for record in recordsToAdd:
 				recordDate = from_timestamp(record[0])
 				recordTime = int(pyall.dateToSecondsSinceMidnight(recordDate)*1000)
 				recordDate = int(pyall.dateToKongsbergDate(recordDate))
 
-		# firstRecordTimestamp = float(recordsToAdd[0][0]) #we need to know the first record timestamp as all observations are milliseconds from that time
-		# firstRecordDate = from_timestamp(firstRecordTimestamp)
-
-		# recordDate = int(dateToKongsbergDate(firstRecordDate))
-		# recordTime = int(dateToSecondsSinceMidnight(firstRecordDate)*1000)
-
+				# firstRecordTimestamp = float(recordsToAdd[0][0]) #we need to know the first record timestamp as all observations are milliseconds from that time
+				# firstRecordDate = from_timestamp(firstRecordTimestamp)
+				# recordDate = int(dateToKongsbergDate(firstRecordDate))
+				# recordTime = int(dateToSecondsSinceMidnight(firstRecordDate)*1000)
 
 				counter = record[1]
 				latitude = record[2]
@@ -1143,7 +1166,8 @@ def injector(outFilePtr, currentRecordTimeStamp, TypeOfDatagram, injectionData, 
 				descriptor = record[8]
 				nBytesDatagram = record[9]
 				data = record[10]
-				datagram = a.encode(recordDate, recordTime, counter, latitude, longitude, quality, speedOverGround, courseOverGround, heading, descriptor, nBytesDatagram, data)
+				pos = pyall.P_POSITION_ENCODER()
+				datagram = pos.encode(recordDate, recordTime, counter, latitude, longitude, quality, speedOverGround, courseOverGround, heading, descriptor, nBytesDatagram, data)
 
 				outFilePtr.write(datagram)
 

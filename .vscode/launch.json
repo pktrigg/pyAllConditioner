@@ -8,10 +8,11 @@
 			"stopOnEntry": false,
 			"program": "${file}",
 			"pythonPath": "python.exe",
-			"args": ["-i", "C:/development/python/sample.all", "-svp"]
+			"args": ["-i", "C:/development/python/sample.all", "-position", "-i", "C:/development/python/norm/0005_20140323_054018.all"]
 		}
 	]
 }
+"args": ["-i", "C:/development/python/sample.all", "-injectP", "C:/development/python/norm/0005_20140323_054018_POSITION_1.txt", "-i", "C:/development/python/norm/0005_20140323_054018.all", "-exclude", "P"]
 "args": ["-i", "C:/development/python/sample.all", "-injectP","c:/development/python/sample_POSITION.txt"]
 "args": ["-injectA", "e:/000/reelax_and_capricornus/20170906.000", "-i", "C:/development/python/0211_20170906_000453_AIMS_Capricornus.all"]
 "args": ["-injectA", "E:/000/reelax_and_capricornus/20170906.002", "-i", "C:/development/python/0211_20170906_000453_AIMS_Capricornus.all", "-odir", "conditioned", "-odix", "injectedTrueHeave"]

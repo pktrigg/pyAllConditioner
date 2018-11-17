@@ -303,8 +303,21 @@ class ALLReader:
 				datagram.read()
 				initialMode = datagram.DepthMode
 		self.rewind()
-		return installStart, installStop, initialMode, datagram
+		return installStart, installStop, initialMode
 
+###############################################################################
+	def loadInitialFrequency(self):
+		'''determine the central frequency of the first record in the file'''
+		initialFrequency = None
+		self.rewind()
+		while self.moreData():
+			typeOfDatagram, datagram = self.readDatagram()
+			if (typeOfDatagram == 'N'):
+				datagram.read()
+				initialFrequency = datagram.CentreFrequency
+				break
+		self.rewind()
+		return initialFrequency
 ###############################################################################
 	def loadNavigation(self, firstRecordOnly=False):
 		'''loads all the navigation into lists'''
@@ -1414,7 +1427,7 @@ class P_POSITION_ENCODER:
 		model = 2045 #needs to be a sensible value to record is valid.  Maybe would be better to pass this from above
 		# try:
 		# fullDatagram = struct.pack(rec_fmt, rec_len-4, STX, ord(typeOfDatagram), model, int(recordDate), int(recordTime), counter, serialNumber, int(height * 100), int(heightType))
-		recordLength =rec_len- 4 + nBytesDatagram + 3 # remove 4 bytes from header and add 3 more for footer
+		recordLength =rec_len- 4 + len(data) + 3 # remove 4 bytes from header and add 3 more for footer
 		fullDatagram = struct.pack(rec_fmt, recordLength,
 						STX,
 						ord(typeOfDatagram),
@@ -1430,7 +1443,8 @@ class P_POSITION_ENCODER:
 						int(courseOverGround * float(100)),
 						int(heading * float(100)),
 						int(descriptor),
-						int(nBytesDatagram) )
+						int(len(data)))
+						# int(nBytesDatagram) )
 		# now add the raw bytes, typically NMEA GGA string
 		fullDatagram = fullDatagram + data.encode('ascii')
 		ETX = 3
