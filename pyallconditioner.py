@@ -350,8 +350,9 @@ def main():
 		if extractPosition:
 			# read the first record so we get a date for the file header
 			typeOfDatagram, datagram = r.readDatagram()
-			str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
-			outPositionFilePtr.write("Name:" + os.path.basename(filename) + "," + str + "\n")
+			str = "Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
+			# str = r.currentRecordDateTime().strftime('%Y%m%d') + ",Timestamp, Counter, Latitude, Longitude, Quality, Speed, Course, Heading, Descriptor, numBytes, Datagram"
+			outPositionFilePtr.write(str + "\n")
 
 		if extractAttitudeHeight:
 			# read the first record so we get a date for the file header
